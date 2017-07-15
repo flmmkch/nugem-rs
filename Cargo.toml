@@ -1,0 +1,10 @@
+[package]
+name = "rugen"
+version = "0.1.0"
+authors = ["Victor Nivet <victor@saumon.ninja>"]
+
+[dependencies]
+sdl2 = "0.29.1"
+gfx = "0.16.1"
+gfx_core = "0.7.1"
+gfx_window_sdl = "0.6.0"
