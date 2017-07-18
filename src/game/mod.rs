@@ -1,3 +1,7 @@
+pub mod graphics;
+
+pub mod mugen;
+
 mod config;
 pub use self::config::Config;
 

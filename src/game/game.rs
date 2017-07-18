@@ -1,40 +1,43 @@
 use super::Config;
 use sdl2;
-use gfx_window_sdl;
-use gfx_core::format::{DepthStencil, Rgba8};
+use sdl2::Sdl;
+use ::game::graphics::window::Window;
+use ::game::mugen::character;
 
 pub struct Game<'a> {
-    sdl_context: &'a sdl2::Sdl,
-    sdl_video: sdl2::VideoSubsystem,
+    sdl_context: &'a Sdl,
     config: Config,
 }
 
 impl<'a> Game<'a> {
-    pub fn new(sdl_context: &'a sdl2::Sdl) -> Game {
-        let sdl_video = sdl_context.video().unwrap();
+    pub fn new(sdl_context: &'a Sdl) -> Game<'a> {
         let config = Config::new();
         Game {
             sdl_context,
-            sdl_video,
             config,
         }
     }
     pub fn run(&self) {
-        let (window, glcontext, device, factory, color_view, depth_view) = {
-            let mut window_builder = self.sdl_video.window("Rugen", self.config.window_size().0, self.config.window_size().1);
-            if self.config.fullscreen() {
-                window_builder.fullscreen();
-            }
-            gfx_window_sdl::init::<Rgba8, DepthStencil>(window_builder).expect("gfx_window_sdl::init failed!")
-        }; 
+        let sdl_video = self.sdl_context.video().unwrap();
+        let mut window = Window::new(&self.config, &sdl_video);
         let mut events = self.sdl_context.event_pump().unwrap();
+        let characters: Vec<character::Character> = self.config.data_paths()
+            .iter()
+            .map(|data_path| { character::find_characters(data_path) })
+            .filter_map(|char_dir| { char_dir })
+            .fold(Vec::new(), |mut v, character_dir| {
+                v.extend(character_dir);
+                v
+            });
+        // let mut current_scene : Box<S> = Box::new();
         'main: loop {
             for event in events.poll_iter() {
                 match event {
                     sdl2::event::Event::Quit {..} => break 'main,
-                    _ => continue,
+                    _ => (),
                 }
             }
+            window.update();
         }
     }
 }
