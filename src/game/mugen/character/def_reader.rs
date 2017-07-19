@@ -5,6 +5,7 @@ pub struct CharacterInfo {
     pub name: String,
     pub display_name: String,
     pub mugen_version: String,
+    pub sprite_filename: String,
 }
 
 pub fn read_def<T: BufRead>(def_categories: Categories<T>) -> Option<CharacterInfo> {
@@ -19,6 +20,15 @@ pub fn read_def<T: BufRead>(def_categories: Categories<T>) -> Option<CharacterIn
                         "name" => character_info.name = key_value.value().to_owned(),
                         "displayname" => character_info.display_name = key_value.value().to_owned(),
                         "mugenversion" => character_info.mugen_version = key_value.value().to_owned(),
+                        _ => (),
+                    }
+                }
+            },
+            "files" => {
+                for key_value in category.key_values() {
+                    let key_name = key_value.key().to_lowercase();
+                    match key_name.as_str() {
+                        "sprite" => character_info.sprite_filename = key_value.value().to_owned(),
                         _ => (),
                     }
                 }
@@ -40,12 +50,14 @@ impl CharacterInfo {
             name: String::new(),
             display_name: String::new(),
             mugen_version: String::new(),
+            sprite_filename: String::new(),
         }
     }
     pub fn valid(&self) -> bool {
         let mut validity = true;
         validity = validity && !self.name.is_empty();
         validity = validity && !self.display_name.is_empty();
+        validity = validity && !self.sprite_filename.is_empty();
         validity
     }
 }

@@ -3,6 +3,7 @@ use std::fs;
 use std::io::BufReader;
 use ::game::mugen::format::generic_def::GenericDef;
 use super::def_reader::read_def;
+use ::game::mugen::format::sff;
 
 #[derive(Debug)]
 pub struct Character {
@@ -25,13 +26,24 @@ impl Character {
     fn read_directory(chara_dir_path: &Path) -> Option<Character> {
         if chara_dir_path.is_dir() {
             if let Some(chara_dir_name) = chara_dir_path.file_name() {
-                let def_path = chara_dir_path.join(Path::new(chara_dir_name).with_extension("def"));
+                let def_path = chara_dir_path.join(Path::new(&chara_dir_name).with_extension("def"));
                 if def_path.is_file() {
                     // read the def file
                     if let Ok(file) = fs::File::open(def_path) {
                         let reader = BufReader::new(file);
                         let def_info = GenericDef::read(reader);
                         if let Some(character_info) = read_def(def_info) {
+                            {
+                                let sprite_path = chara_dir_path.join(Path::new(&character_info.sprite_filename));
+                                let file_res = fs::File::open(sprite_path);
+                                if let Ok(file) = file_res {
+                                    let buf_reader = BufReader::new(file);
+                                    match sff::read(buf_reader) {
+                                        Ok(_) => (),
+                                        Err(e) => println!("Error when reading character {}: {:?}", &character_info.display_name, e),
+                                    }
+                                }
+                            }
                             let character = Character {
                                 name: character_info.name,
                                 display_name: character_info.display_name,

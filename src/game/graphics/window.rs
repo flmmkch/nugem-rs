@@ -29,7 +29,7 @@ pub struct Window {
     depth_view: gfx_types::DepthView,
 }
 
-const CLEAR_COLOR: [f32; 4] = [0.1, 0.2, 0.6, 1.0];
+const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
 
 impl Window {
     pub fn new(config: &Config, sdl_video: &sdl2::VideoSubsystem) -> Window {

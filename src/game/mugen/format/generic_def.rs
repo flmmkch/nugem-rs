@@ -26,6 +26,7 @@ impl<T: BufRead> Iterator for Categories<T> {
 
     fn next(&mut self) -> Option<Category> {
         let mut empty_category = true;
+        let mut category_has_name = false;
         let mut next_category = false;
         let mut name = String::new();
         let mut key_values = Vec::new();
@@ -42,20 +43,19 @@ impl<T: BufRead> Iterator for Categories<T> {
                         fn captures_to_category_name(captures: Captures) -> String {
                             captures.get(1).map_or("", |m| m.as_str()).to_owned()
                         };
-                        if self.first_category {
-                            self.first_category = false;
+                        if self.first_category && (&name == "") {
                             empty_category = false;
                             name = captures_to_category_name(c);
+                            category_has_name = true;
                         }
                         else {
-                            if empty_category {
-                                empty_category = false;
+                            next_category = true;
+                            if !category_has_name {
                                 name = self.next_name.to_owned();
-                            }
-                            else {
-                                self.next_name = captures_to_category_name(c);
-                                next_category = true;
-                            }
+                                category_has_name = true;
+                            }                            
+                            self.next_name = captures_to_category_name(c);
+                            empty_category = false;
                         }
                     }
                     else {
@@ -79,7 +79,7 @@ impl<T: BufRead> Iterator for Categories<T> {
                         }
                     }
                 },
-                Some(Err(_)) => return self.next(),
+                Some(Err(_)) => continue,
                 None => {
                     if !self.first_category {
                         empty_category = false;
@@ -99,9 +99,10 @@ impl<T: BufRead> Iterator for Categories<T> {
         }
         else {
             let category = Category {
-            name,
-            key_values
-        };
+                name,
+                key_values
+            };
+            self.first_category = false;
             Some(category)
         }
     }
@@ -153,12 +154,22 @@ mod test {
 
             [info2]
             number = 23
+
+
+
+            test = ok
+
+;
+
+            world = "hello"
+
+            [info3]
             "#;
         let categories : Vec<_> = GenericDef::read(Cursor::new(test_string)).collect();
-        assert_eq!(categories.len(), 2);
+        assert_eq!(categories.len(), 3);
         assert_eq!(categories[0].name(), "info");
         assert_eq!(categories[0].key_values().len(), 2);
         assert_eq!(categories[1].name(), "info2");
-        assert_eq!(categories[1].key_values().len(), 1);
+        assert_eq!(categories[1].key_values().len(), 3);
     }
 }
