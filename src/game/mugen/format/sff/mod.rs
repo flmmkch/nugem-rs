@@ -1,6 +1,8 @@
 pub mod v1;
 pub mod v2;
 use std::io::{self, Read, Seek};
+use std::path::Path;
+use ::game::mugen::character::CharacterInfo;
 
 #[derive(Debug)]
 pub enum Data {
@@ -17,7 +19,7 @@ pub enum Error {
     SffV2Error(v2::Error),
 }
 
-pub fn read<T: Read + Seek>(mut reader: T) -> Result<Data, Error> {
+pub fn read<T: Read + Seek>(mut reader: T, character_info: &CharacterInfo, character_dir: &Path) -> Result<Data, Error> {
     // first: the signature at the start of the file
     {
         let mut sig_buffer = [0; 12];
@@ -35,8 +37,12 @@ pub fn read<T: Read + Seek>(mut reader: T) -> Result<Data, Error> {
     match reader.read_exact(&mut v_buffer) {
         Ok(()) => {
             if &v_buffer == &[0, 1, 0, 1] {
-                match v1::read(reader) {
-                    Ok(d) => Ok(Data::V1(d)),
+                match v1::read_sff(reader) {
+                    Ok((sprites, groups, shared_palette)) => {
+                        let palettes : Vec<_> = v1::pal::PaletteFilesReader::new(character_info, character_dir).collect();
+                        let data = v1::Data::new(sprites, groups, palettes, shared_palette);
+                        Ok(Data::V1(data))
+                    },
                     Err(e) => Err(Error::SffV1Error(e)),
                 }
             }
@@ -56,6 +62,7 @@ pub fn read<T: Read + Seek>(mut reader: T) -> Result<Data, Error> {
     }
 }
 
+/// Read a little-endian unsigned 32-bit integer
 pub fn read_u32<T: Read>(reader: &mut T) -> Result<u32, io::Error> {
     let mut v_buffer = [0; 4];
     reader.read_exact(&mut v_buffer)?;
@@ -70,6 +77,7 @@ pub fn read_u32<T: Read>(reader: &mut T) -> Result<u32, io::Error> {
     Ok(result)
 }
 
+/// Read a little-endian unsigned 16-bit integer
 pub fn read_u16<T: Read>(reader: &mut T) -> Result<u16, io::Error> {
     let mut v_buffer = [0; 2];
     reader.read_exact(&mut v_buffer)?;
@@ -84,6 +92,7 @@ pub fn read_u16<T: Read>(reader: &mut T) -> Result<u16, io::Error> {
     Ok(result)
 }
 
+/// Read an unsigned 8-bit integer
 pub fn read_u8<T: Read>(reader: &mut T) -> Result<u8, io::Error> {
     let mut v_buffer = [0; 1];
     reader.read_exact(&mut v_buffer)?;

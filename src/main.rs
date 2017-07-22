@@ -1,5 +1,5 @@
 extern crate sdl2;
-// #[macro_use]
+#[macro_use]
 extern crate gfx;
 extern crate gfx_core;
 extern crate gfx_window_sdl;

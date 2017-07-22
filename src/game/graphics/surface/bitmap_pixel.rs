@@ -1,17 +1,29 @@
-pub struct BitmapPixel {
-    pub a: u8,
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
+#[derive(Clone)]
+#[derive(Debug)]
+pub struct BitmapPixel(u8, u8, u8, u8);
 
 impl BitmapPixel {
-    pub fn new(a: u8, r: u8, g: u8, b: u8) -> BitmapPixel {
-        BitmapPixel {
-            a,
+    pub fn new(r: u8, g: u8, b: u8, a: u8) -> BitmapPixel {
+        BitmapPixel(
             r,
             g,
             b,
-        }
+            a,
+        )
+    }
+    pub fn a(&self) -> u8 {
+        self.0
+    }
+    pub fn r(&self) -> u8 {
+        self.1
+    }
+    pub fn g(&self) -> u8 {
+        self.2
+    }
+    pub fn b(&self) -> u8 {
+        self.3
+    }
+    pub fn to_rgba(&self) -> Vec<u8> {
+        vec![self.r(), self.g(), self.b(), self.a()]
     }
 }

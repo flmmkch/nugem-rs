@@ -3,6 +3,7 @@ use sdl2;
 use sdl2::Sdl;
 use ::game::graphics::window::Window;
 use ::game::mugen::character;
+use ::game::graphics::sprite_displayer;
 
 pub struct Game<'a> {
     sdl_context: &'a Sdl,
@@ -29,13 +30,35 @@ impl<'a> Game<'a> {
                 v.extend(character_dir);
                 v
             });
-        // let mut current_scene : Box<S> = Box::new();
+        // Debug: faces for the characters
+        let mut sprite_atlas_builder = sprite_displayer::TextureAtlasBuilder::new();
+        for character in characters.iter() {
+            use ::game::mugen::format::sff;
+            if let sff::Data::V1(ref d) = *character.sff_data() {
+                let palette = &d.palettes()[0];
+                if let Some(s) = d.sprite_surface(9000, 0, palette) {
+                    sprite_atlas_builder.add_surface(s);
+                }
+            }
+        }
+        let sprite_atlas = sprite_atlas_builder.build(window.factory()).unwrap();
+        let sprite_context = sprite_displayer::DrawingContext::new(window.factory());
+        let sprite_canvas = {
+            let mut sprite_canvas = sprite_displayer::SpritesDrawer::new(&sprite_atlas);
+            sprite_canvas.add_sprite(3, 0, 0, 400, 400);
+            sprite_canvas
+        };
         'main: loop {
             for event in events.poll_iter() {
                 match event {
                     sdl2::event::Event::Quit {..} => break 'main,
                     _ => (),
                 }
+            }
+            window.clear();
+            {
+                let (factory, encoder, render_target_view) = window.gfx_data();
+                sprite_canvas.draw(&sprite_context, factory, encoder, render_target_view);
             }
             window.update();
         }

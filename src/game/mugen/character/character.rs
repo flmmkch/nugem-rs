@@ -3,13 +3,13 @@ use std::fs;
 use std::io::BufReader;
 use ::game::mugen::format::generic_def::GenericDef;
 use super::def_reader::read_def;
+use super::CharacterInfo;
 use ::game::mugen::format::sff;
 
 #[derive(Debug)]
 pub struct Character {
-    name: String,
-    display_name: String,
-    mugen_version: String,
+    info: CharacterInfo,
+    sff: sff::Data,
 }
 
 pub struct CharactersDir {
@@ -17,11 +17,14 @@ pub struct CharactersDir {
 }
 
 impl Character {
-    pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-    pub fn display_name(&self) -> &str {
-        self.display_name.as_str()
+    // pub fn name(&self) -> &str {
+    //     self.info["info"]["name"].as_str()
+    // }
+    // pub fn display_name(&self) -> &str {
+    //     self.info["info"]["displayname"].as_str()
+    // }
+    pub fn sff_data(&self) -> &sff::Data {
+        &self.sff
     }
     fn read_directory(chara_dir_path: &Path) -> Option<Character> {
         if chara_dir_path.is_dir() {
@@ -33,21 +36,26 @@ impl Character {
                         let reader = BufReader::new(file);
                         let def_info = GenericDef::read(reader);
                         if let Some(character_info) = read_def(def_info) {
-                            {
-                                let sprite_path = chara_dir_path.join(Path::new(&character_info.sprite_filename));
+                            let sff_data = {
+                                let sprite_path = chara_dir_path.join(Path::new(&character_info["files"]["sprite"]));
                                 let file_res = fs::File::open(sprite_path);
                                 if let Ok(file) = file_res {
                                     let buf_reader = BufReader::new(file);
-                                    match sff::read(buf_reader) {
-                                        Ok(_) => (),
-                                        Err(e) => println!("Error when reading character {}: {:?}", &character_info.display_name, e),
+                                    match sff::read(buf_reader, &character_info, &chara_dir_path) {
+                                        Ok(d) => d,
+                                        Err(e) => {
+                                            println!("Error when reading character {}: {:?}", &character_info["info"]["displayname"], e);
+                                            return None;
+                                        },
                                     }
                                 }
-                            }
+                                else {
+                                    return None;
+                                }
+                            };
                             let character = Character {
-                                name: character_info.name,
-                                display_name: character_info.display_name,
-                                mugen_version: character_info.mugen_version,
+                                info: character_info,
+                                sff: sff_data,
                             };
                             return Some(character);
                         }

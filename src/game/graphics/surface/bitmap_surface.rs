@@ -1,5 +1,6 @@
 use super::BitmapPixel;
 
+#[derive(Debug)]
 pub struct BitmapSurface {
     w: usize,
     h: usize,
@@ -19,25 +20,31 @@ impl BitmapSurface {
         bitmap_surface.zero_init();
         bitmap_surface
     }
-    fn zero_init(&mut self) {
-        // Clear is supposed to have no effect on the capacity for the vector
+    pub fn zero_init(&mut self) {
+        // Clear is supposed to have no effect on the capacity for the vector: it stays at w * h
         self.pixels.clear();
-        // Fill with black pixels
+        // Fill with transparent pixels
         for _ in 0..(self.w * self.h) {
-            self.pixels.push(BitmapPixel::new(255, 0, 0, 0));
+            self.pixels.push(BitmapPixel::new(0, 0, 0, 0));
         }
     }
-    fn width(&self) -> u32 {
+    pub fn width(&self) -> u32 {
         self.w as u32
     }
-    fn height(&self) -> u32 {
+    pub fn height(&self) -> u32 {
         self.h as u32
     }
-    fn pixels(&self) -> &[BitmapPixel] {
-        &self.pixels
-    }
-    fn pixels_mut(&mut self) -> &mut [BitmapPixel] {
+    // pub fn pixels(&self) -> &[BitmapPixel] {
+    //     &self.pixels
+    // }
+    pub fn pixels_mut(&mut self) -> &mut [BitmapPixel] {
         &mut self.pixels
     }
-    //pub fn redimension(&mut self, width: u32, height: u32) {}
+    pub fn to_rgba(&self) -> Vec<u8> {
+        let mut rgba = Vec::with_capacity(self.pixels.len() * 4);
+        for ref pixel in &self.pixels {
+            rgba.extend(pixel.to_rgba());
+        }
+        rgba
+    }
 }

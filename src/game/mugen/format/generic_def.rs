@@ -1,5 +1,5 @@
-use regex::{ Regex, Captures };
-use std::io::{ Read, BufRead, BufReader, Lines };
+use regex::{Regex, Captures};
+use std::io::{BufRead, BufReader, Lines};
 
 pub struct GenericDef {
 }
@@ -128,8 +128,7 @@ impl KeyValue {
 
 impl GenericDef {
     /// Read a *.def file and get an iterator on the categories
-    pub fn read<T: Read>(input: T) -> Categories<BufReader<T>> {
-        use std::io::BufRead;
+    pub fn read<T: BufRead>(input: T) -> Categories<BufReader<T>> {
         let buffer = BufReader::new(input);
         Categories {
             lines: buffer.lines(),

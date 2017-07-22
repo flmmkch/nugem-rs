@@ -14,6 +14,6 @@ impl From<io::Error> for Error {
     }
 }
 
-pub fn read<T: Read>(mut reader: T) -> Result<Data, Error> {
+pub fn read<T: Read>(_: T) -> Result<Data, Error> {
     Ok(Data{})
 }

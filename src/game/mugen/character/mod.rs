@@ -1,5 +1,5 @@
 mod def_reader;
 mod character;
-pub use self::character::Character;
-pub use self::character::find_characters;
-pub use self::character::CharactersDir;
+mod character_info;
+pub use self::character::{Character, find_characters, CharactersDir};
+pub use self::character_info::{CharacterInfo, ValidInfo};
