@@ -149,7 +149,7 @@ impl<'a> SpritesDrawer<'a> {
     }
     pub fn draw(&self, context: &DrawingContext, factory: &mut gfx_types::Factory, encoder: &mut gfx_types::Encoder, render_target_view: gfx_types::RenderTargetView) {
         let mut shape_vertex = Vec::new();
-        // let dimensions_float = (render_target_view.get_dimensions().0 as f32, render_target_view.get_dimensions().1 as f32);
+        let dimensions_float = (render_target_view.get_dimensions().0 as f32, render_target_view.get_dimensions().1 as f32);
         for draw_sprite in self.draw_sprites.iter() {
             let texture_corners = {
                 let (v_top, v_bottom) = self.texture_atlas.v_bounds(draw_sprite.index);
@@ -162,33 +162,23 @@ impl<'a> SpritesDrawer<'a> {
                 )
             };
             let canvas_corners = {
-                // let x = 2.0 * ((draw_sprite.x as f32) - dimensions_float.0) / dimensions_float.0;
-                // let y = 2.0 * ((draw_sprite.y as f32) - dimensions_float.1) / dimensions_float.1;
-                // let width = (draw_sprite.width as f32) / dimensions_float.0;
-                // let height = (draw_sprite.height as f32) / dimensions_float.1;
-                // (
-                //     [x, y + height], // top left
-                //     [x + width, y + height], // top right
-                //     [x + width, y], // bottom right
-                //     [x, y], // bottom left
-                // )
-                // (
-                //     [1.0, 1.0], // top left
-                //     [-1.0, 1.0], // top right
-                //     [-1.0, -1.0], // bottom right
-                //     [1.0, -1.0], // bottom left
-                // )
+                let x = (2.0 * (draw_sprite.x as f32) + dimensions_float.0) / dimensions_float.0 - 2.0;
+                let y = (2.0 * (draw_sprite.y as f32) + dimensions_float.1) / dimensions_float.1 - 2.0;
+                let width = 2.0 * (draw_sprite.width as f32) / dimensions_float.0;
+                let height = 2.0 * (draw_sprite.height as f32) / dimensions_float.1;
                 (
-                    [1.0, 1.0], // top left
-                    [-1.0, 1.0], // top right
-                    [-1.0, -1.0], // bottom right
-                    [1.0, -1.0], // bottom left
+                    [x, y + height], // top left
+                    [x + width, y + height], // top right
+                    [x + width, y], // bottom right
+                    [x, y], // bottom left
                 )
             };
             shape_vertex.push(Vertex { pos: canvas_corners.0, uv: texture_corners.0 }); // top left
             shape_vertex.push(Vertex { pos: canvas_corners.1, uv: texture_corners.1 }); // top right
             shape_vertex.push(Vertex { pos: canvas_corners.2, uv: texture_corners.2 }); // bottom right
+            shape_vertex.push(Vertex { pos: canvas_corners.0, uv: texture_corners.0 }); // top left
             shape_vertex.push(Vertex { pos: canvas_corners.3, uv: texture_corners.3 }); // bottom left
+            shape_vertex.push(Vertex { pos: canvas_corners.2, uv: texture_corners.2 }); // bottom right
         }
         let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&shape_vertex[..], ());
         let sampler = factory.create_sampler_linear();
