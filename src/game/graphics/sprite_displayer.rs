@@ -181,7 +181,11 @@ impl<'a> SpritesDrawer<'a> {
             shape_vertex.push(Vertex { pos: canvas_corners.2, uv: texture_corners.2 }); // bottom right
         }
         let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&shape_vertex[..], ());
-        let sampler = factory.create_sampler_linear();
+        let sampler = {
+            use gfx::texture;
+            let sampler_info = texture::SamplerInfo::new(texture::FilterMethod::Scale, texture::WrapMode::Tile);
+            factory.create_sampler(sampler_info)
+        };
         let texture = self.texture_atlas.resource_view().clone();
         let data = sprite_pipe::Data {
             vbuf: vertex_buffer,
