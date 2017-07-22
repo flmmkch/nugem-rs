@@ -85,7 +85,7 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
                 let (run_length, color_index) = {
                     let first_byte = read_u8(&mut reader)?;
                     // if it's a RLE byte
-                    if (first_byte & 0xC0) > 0 {
+                    if (first_byte & 0xC0) == 0xC0 {
                         let mut run_length = first_byte & 0x3F;
                         if pixel_index + (run_length as usize) > max_pixel {
                             run_length = (max_pixel - pixel_index) as u8;
