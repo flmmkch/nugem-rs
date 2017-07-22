@@ -11,16 +11,16 @@ impl BitmapPixel {
             a,
         )
     }
-    pub fn a(&self) -> u8 {
+    pub fn r(&self) -> u8 {
         self.0
     }
-    pub fn r(&self) -> u8 {
+    pub fn g(&self) -> u8 {
         self.1
     }
-    pub fn g(&self) -> u8 {
+    pub fn b(&self) -> u8 {
         self.2
     }
-    pub fn b(&self) -> u8 {
+    pub fn a(&self) -> u8 {
         self.3
     }
     pub fn to_rgba(&self) -> Vec<u8> {

@@ -32,20 +32,26 @@ impl<'a> Game<'a> {
             });
         // Debug: faces for the characters
         let mut sprite_atlas_builder = sprite_displayer::TextureAtlasBuilder::new();
+        let mut character_faces = Vec::new();
         for character in characters.iter() {
             use ::game::mugen::format::sff;
             if let sff::Data::V1(ref d) = *character.sff_data() {
                 let palette = &d.palettes()[0];
                 if let Some(s) = d.sprite_surface(9000, 0, palette) {
-                    sprite_atlas_builder.add_surface(s);
+                    character_faces.push(sprite_atlas_builder.add_surface(s));
                 }
             }
         }
+        let selected_character = 3;
         let sprite_atlas = sprite_atlas_builder.build(window.factory()).unwrap();
         let sprite_context = sprite_displayer::DrawingContext::new(window.factory());
         let sprite_canvas = {
             let mut sprite_canvas = sprite_displayer::SpritesDrawer::new(&sprite_atlas);
-            sprite_canvas.add_sprite(3, 0, 0, 400, 400);
+            for i in 0..character_faces.len() {
+                let h = 20 + (i as u32) * 140;
+                sprite_canvas.add_sprite(character_faces[i], 60, h, 120, 120);
+            }
+            sprite_canvas.add_sprite(selected_character, 500, 150, 240, 240);
             sprite_canvas
         };
         'main: loop {
