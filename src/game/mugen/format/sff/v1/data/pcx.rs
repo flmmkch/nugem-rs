@@ -34,15 +34,15 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
             _ => return Err(Error::InvalidPcxData(format!("Bad encoding byte: {}", encoding_byte))),
         }
     };
-    // byte 3: bits per plane
+    // byte 3: bits per pixel
     // number of bits per pixel in each color plane: 1, 2, 4, 8, 24
-    {
+    let bits_per_pixel = {
         let bpp_byte = read_u8(&mut reader)?;
         match bpp_byte {
-            1 | 2 | 4 | 8 | 24 => (),
+            1 | 2 | 4 | 8 | 24 => bpp_byte as u16,
             _ => return Err(Error::InvalidPcxData(format!("Invalid bits per plane: {}", bpp_byte))),
         }
-    }
+    };
     // bytes 4 - 10: image size
     // width
     let (width, height) = {
@@ -68,33 +68,48 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
         }
     }
     // 65: number of color planes
+    let bit_planes = (read_u8(&mut reader)?) as u16;
     // 66 - 67: bytes per plane for a line
+    let bytes_per_line = read_u16(&mut reader)?;
     // 68 - 69: palette type
+    reader.seek(SeekFrom::Current(2))?;
     // 70 - 71: horizontal scrolling info
+    reader.seek(SeekFrom::Current(2))?;
     // 72 - 73: vertical scrolling info
+    reader.seek(SeekFrom::Current(2))?;
     // skip to byte 128
     reader.seek(SeekFrom::Start(128))?;
+    let scanline_length = bit_planes * bytes_per_line;
+    let line_padding = scanline_length * 8 / bits_per_pixel - width;
     let mut surface = BitmapSurface::new(width as u32, height as u32);
     // finished reading the header, now reading the pixel data
     {
         let max_pixel = (surface.width() * surface.height()) as usize;
         let mut pixel_index = 0;
+        let mut scanline_position = 0;
         // if the image uses PCX run-length encoding
         if using_rle {
             while pixel_index < max_pixel {
                 let (run_length, color_index) = {
-                    let first_byte = read_u8(&mut reader)?;
-                    // if it's a RLE byte
-                    if (first_byte & 0xC0) == 0xC0 {
-                        let mut run_length = first_byte & 0x3F;
-                        if pixel_index + (run_length as usize) > max_pixel {
-                            run_length = (max_pixel - pixel_index) as u8;
+                    if scanline_position < width {
+                        let first_byte = read_u8(&mut reader)?;
+                        // if it's a RLE byte
+                        if (first_byte & 0xC0) == 0xC0 {
+                            let mut run_length = first_byte & 0x3F;
+                            if pixel_index + (run_length as usize) > max_pixel {
+                                run_length = (max_pixel - pixel_index) as u8;
+                            }
+                            let second_byte = read_u8(&mut reader)?;
+                            scanline_position += run_length as u16;
+                            (run_length as usize, second_byte as usize)
                         }
-                        let second_byte = read_u8(&mut reader)?;
-                        (run_length as usize, second_byte as usize)
+                        else {
+                            (1, first_byte as usize)
+                        }
                     }
                     else {
-                        (1, first_byte as usize)
+                        scanline_position = 0;
+                        (line_padding as usize, 0)
                     }
                 };
                 let color = {
@@ -105,10 +120,10 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
                         Color::Transparent
                     }
                 };
-                for i in 0..run_length {
-                    surface.pixels_mut()[pixel_index + i] = color.into();
+                for _ in 0..run_length {
+                    surface.pixels_mut()[pixel_index] = color.into();
+                    pixel_index += 1;
                 }
-                pixel_index += run_length;
             }
         }
         else {
