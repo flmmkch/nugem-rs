@@ -34,17 +34,10 @@ impl BitmapSurface {
     pub fn height(&self) -> u32 {
         self.h as u32
     }
-    // pub fn pixels(&self) -> &[BitmapPixel] {
-    //     &self.pixels
-    // }
+    pub fn pixels(&self) -> &[BitmapPixel] {
+        &self.pixels
+    }
     pub fn pixels_mut(&mut self) -> &mut [BitmapPixel] {
         &mut self.pixels
-    }
-    pub fn to_rgba(&self) -> Vec<u8> {
-        let mut rgba = Vec::with_capacity(self.pixels.len() * 4);
-        for ref pixel in &self.pixels {
-            rgba.extend(pixel.to_rgba());
-        }
-        rgba
     }
 }

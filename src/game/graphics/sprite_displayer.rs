@@ -77,13 +77,30 @@ impl TextureAtlasBuilder {
                 (max_width, total_height)
             };
             let mut sprite_canvases = Vec::new();
-            let mut total_rgba = Vec::new();
+            let mut total_rgba = Vec::with_capacity(4 * max_width * total_height);
             let mut current_height = 0.0;
             for surface in self.surfaces {
                 let height = (surface.height() as f32) / (total_height as f32);
                 let width = (surface.width() as f32) / (max_width as f32);
                 sprite_canvases.push(SpriteCanvasInfo::new(current_height, width));
-                total_rgba.extend(surface.to_rgba());
+                {
+                    let padding : Vec<u8> = {
+                        let padding_size = 4 * (max_width - (surface.width() as usize)); 
+                        vec![0; padding_size]
+                    };
+                    let mut surface_index = 0;
+                    for _ in 0..(surface.height() as usize) {
+                        for _ in 0..(surface.width() as usize) {
+                            let pixel = &surface.pixels()[surface_index];
+                            total_rgba.push(pixel.r());
+                            total_rgba.push(pixel.g());
+                            total_rgba.push(pixel.b());
+                            total_rgba.push(pixel.a());
+                            surface_index += 1;
+                        }
+                        total_rgba.extend(padding.clone());
+                    }
+                }
                 current_height += height;
             }
             (total_rgba, sprite_canvases, max_width, total_height)

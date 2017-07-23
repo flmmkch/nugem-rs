@@ -4,6 +4,7 @@ use sdl2::Sdl;
 use ::game::graphics::window::Window;
 use ::game::mugen::character;
 use ::game::graphics::sprite_displayer;
+use ::game::mugen::format::sff;
 
 pub struct Game<'a> {
     sdl_context: &'a Sdl,
@@ -34,7 +35,6 @@ impl<'a> Game<'a> {
         let mut sprite_atlas_builder = sprite_displayer::TextureAtlasBuilder::new();
         let mut character_faces = Vec::new();
         for character in characters.iter() {
-            use ::game::mugen::format::sff;
             if let sff::Data::V1(ref d) = *character.sff_data() {
                 let palette = &d.palettes()[0];
                 if let Some(s) = d.sprite_surface(9000, 0, palette) {
@@ -43,6 +43,19 @@ impl<'a> Game<'a> {
             }
         }
         let selected_character = 3;
+        let selected_index = {
+            if let sff::Data::V1(ref d) = *characters[selected_character].sff_data() {
+                if let Some(s) = d.sprite_surface(9000, 1, &d.palettes()[0]) {
+                    sprite_atlas_builder.add_surface(s)
+                }
+                else {
+                    character_faces[selected_character]
+                }
+            }
+            else {
+                character_faces[selected_character]
+            }
+        };
         let sprite_atlas = sprite_atlas_builder.build(window.factory()).unwrap();
         let sprite_context = sprite_displayer::DrawingContext::new(window.factory());
         let sprite_canvas = {
@@ -51,7 +64,7 @@ impl<'a> Game<'a> {
                 let h = 20 + (i as u32) * 140;
                 sprite_canvas.add_sprite(character_faces[i], 60, h, 120, 120);
             }
-            sprite_canvas.add_sprite(selected_character, 500, 150, 240, 240);
+            sprite_canvas.add_sprite(selected_index, 500, 150, 240, 240);
             sprite_canvas
         };
         'main: loop {

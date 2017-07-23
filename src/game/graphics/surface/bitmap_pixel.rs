@@ -23,7 +23,4 @@ impl BitmapPixel {
     pub fn a(&self) -> u8 {
         self.3
     }
-    pub fn to_rgba(&self) -> Vec<u8> {
-        vec![self.r(), self.g(), self.b(), self.a()]
-    }
 }
