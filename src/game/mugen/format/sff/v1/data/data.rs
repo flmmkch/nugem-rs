@@ -42,7 +42,7 @@ impl Data {
     }
     fn sprite_palette<'a>(&self, sprite_index: usize, general_palette: &'a Palette) -> Cow<'a, Palette> {
         let mut result = Cow::Borrowed(general_palette);
-        for i in 0..sprite_index {
+        for i in 0..sprite_index+1 {
             let sprite = &self.sprites[sprite_index - i];
             if self.shared_palette && sprite.uses_shared_palette {
                 break;

@@ -42,7 +42,7 @@ impl<'a> Game<'a> {
                 }
             }
         }
-        let selected_character = 3;
+        let selected_character = 1;
         let selected_index = {
             if let sff::Data::V1(ref d) = *characters[selected_character].sff_data() {
                 if let Some(s) = d.sprite_surface(9000, 1, &d.palettes()[0]) {

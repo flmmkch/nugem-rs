@@ -17,12 +17,14 @@ pub struct CharactersDir {
 }
 
 impl Character {
-    // pub fn name(&self) -> &str {
-    //     self.info["info"]["name"].as_str()
-    // }
-    // pub fn display_name(&self) -> &str {
-    //     self.info["info"]["displayname"].as_str()
-    // }
+    #[allow(dead_code)]
+    pub fn name(&self) -> &str {
+        self.info["info"]["name"].as_str()
+    }
+    #[allow(dead_code)]
+    pub fn display_name(&self) -> &str {
+        self.info["info"]["displayname"].as_str()
+    }
     pub fn sff_data(&self) -> &sff::Data {
         &self.sff
     }
