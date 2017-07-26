@@ -1,7 +1,7 @@
-use std::io::{self, Read};
+use std::io;
 
-#[derive(Debug)]
-pub struct Data {}
+mod data;
+pub use self::data::{Data, GroupInfo, ImageFormat, PaletteInfo, SpriteInfo};
 
 #[derive(Debug)]
 pub enum Error {
@@ -14,6 +14,5 @@ impl From<io::Error> for Error {
     }
 }
 
-pub fn read<T: Read>(_: T) -> Result<Data, Error> {
-    Ok(Data{})
-}
+mod sff;
+pub use self::sff::read_sff;

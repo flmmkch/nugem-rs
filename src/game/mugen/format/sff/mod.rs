@@ -1,8 +1,9 @@
 pub mod v1;
 pub mod v2;
 use std::io::{self, Read, Seek};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use ::game::mugen::character::CharacterInfo;
+use ::game::graphics::surface::BitmapSurface;
 
 #[derive(Debug)]
 pub enum Data {
@@ -17,6 +18,27 @@ pub enum Error {
     UnknownVersion,
     SffV1Error(v1::Error),
     SffV2Error(v2::Error),
+    FileOpeningError(PathBuf),
+}
+
+pub trait SffData {
+    fn palette_count(&self) -> usize;
+    fn render_sprite(&self, group_index: u16, image_index: u16, palette_index: usize) -> Option<BitmapSurface>;
+}
+
+impl SffData for Data {
+    fn palette_count(&self) -> usize {
+        match self {
+            &Data::V1(ref d) => d.palette_count(),
+            &Data::V2(ref d) => d.palette_count(),
+        }
+    }
+    fn render_sprite(&self, group_index: u16, image_index: u16, palette_index: usize) -> Option<BitmapSurface> {
+        match self {
+            &Data::V1(ref d) => d.render_sprite(group_index, image_index, palette_index),
+            &Data::V2(ref d) => d.render_sprite(group_index, image_index, palette_index),
+        }
+    }
 }
 
 pub fn read<T: Read + Seek>(mut reader: T, character_info: &CharacterInfo, character_dir: &Path) -> Result<Data, Error> {
@@ -48,7 +70,7 @@ pub fn read<T: Read + Seek>(mut reader: T, character_info: &CharacterInfo, chara
             }
             else {
                 if &v_buffer == &[0, 1, 0, 2] {
-                    match v2::read(reader) {
+                    match v2::read_sff(reader) {
                         Ok(d) => Ok(Data::V2(d)),
                         Err(e) => Err(Error::SffV2Error(e)),
                     }

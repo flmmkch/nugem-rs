@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs;
 use std::io::BufReader;
 use ::game::mugen::format::generic_def::GenericDef;
@@ -9,7 +9,7 @@ use ::game::mugen::format::sff;
 #[derive(Debug)]
 pub struct Character {
     info: CharacterInfo,
-    sff: sff::Data,
+    path: PathBuf,
 }
 
 pub struct CharactersDir {
@@ -25,9 +25,6 @@ impl Character {
     pub fn display_name(&self) -> &str {
         self.info["info"]["displayname"].as_str()
     }
-    pub fn sff_data(&self) -> &sff::Data {
-        &self.sff
-    }
     fn read_directory(chara_dir_path: &Path) -> Option<Character> {
         if chara_dir_path.is_dir() {
             if let Some(chara_dir_name) = chara_dir_path.file_name() {
@@ -38,26 +35,9 @@ impl Character {
                         let reader = BufReader::new(file);
                         let def_info = GenericDef::read(reader);
                         if let Some(character_info) = read_def(def_info) {
-                            let sff_data = {
-                                let sprite_path = chara_dir_path.join(Path::new(&character_info["files"]["sprite"]));
-                                let file_res = fs::File::open(sprite_path);
-                                if let Ok(file) = file_res {
-                                    let buf_reader = BufReader::new(file);
-                                    match sff::read(buf_reader, &character_info, &chara_dir_path) {
-                                        Ok(d) => d,
-                                        Err(e) => {
-                                            println!("Error when reading character {}: {:?}", &character_info["info"]["displayname"], e);
-                                            return None;
-                                        },
-                                    }
-                                }
-                                else {
-                                    return None;
-                                }
-                            };
                             let character = Character {
                                 info: character_info,
-                                sff: sff_data,
+                                path: chara_dir_path.to_path_buf(),
                             };
                             return Some(character);
                         }
@@ -69,6 +49,17 @@ impl Character {
             }
         }
         None
+    }
+    pub fn read_data(&self) -> Result<sff::Data, sff::Error> {
+        let sprite_path = self.path.join(Path::new(&self.info["files"]["sprite"]));
+        let file_res = fs::File::open(&sprite_path);
+        if let Ok(file) = file_res {
+            let buf_reader = BufReader::new(file);
+            sff::read(buf_reader, &self.info, &self.path)
+        }
+        else {
+            Err(sff::Error::FileOpeningError(sprite_path))
+        }
     }
 }
 

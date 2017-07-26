@@ -4,6 +4,7 @@ use ::game::graphics::surface::BitmapSurface;
 use std::borrow::{Borrow, Cow};
 use super::pcx;
 use super::{Color, Palette, PALETTE_COLOR_COUNT};
+use super::super::super::SffData;
 
 #[derive(Debug)]
 pub struct Sprite {
@@ -36,9 +37,6 @@ impl Data {
             palettes,
             shared_palette,
         }
-    }
-    pub fn palettes(&self) -> &[Palette] {
-        &self.palettes[..]
     }
     fn sprite_palette<'a>(&self, sprite_index: usize, general_palette: &'a Palette) -> Cow<'a, Palette> {
         let mut result = Cow::Borrowed(general_palette);
@@ -110,5 +108,14 @@ impl Data {
         else {
             self.sprite_linked_index_surface(specified_sprite.linked_index, palette)
         }
-    } 
+    }
+}
+
+impl SffData for Data {
+    fn palette_count(&self) -> usize {
+        self.palettes.len()
+    }
+    fn render_sprite(&self, group_index: u16, image_index: u16, palette_index: usize) -> Option<BitmapSurface> {
+        self.sprite_surface(group_index, image_index, &self.palettes[palette_index])
+    }
 }

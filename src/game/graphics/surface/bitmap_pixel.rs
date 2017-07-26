@@ -1,5 +1,6 @@
 #[derive(Clone)]
 #[derive(Debug)]
+#[derive(Copy)]
 pub struct BitmapPixel(u8, u8, u8, u8);
 
 impl BitmapPixel {
