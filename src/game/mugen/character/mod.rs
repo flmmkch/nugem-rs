@@ -1,4 +1,3 @@
-mod def_reader;
 mod character;
 mod character_info;
 pub use self::character::{Character, find_characters, CharactersDir};

@@ -2,8 +2,7 @@ use std::path::{Path, PathBuf};
 use std::fs;
 use std::io::BufReader;
 use ::game::mugen::format::generic_def::GenericDef;
-use super::def_reader::read_def;
-use super::CharacterInfo;
+use super::character_info::{self, CharacterInfo};
 use ::game::mugen::format::sff;
 
 #[derive(Debug)]
@@ -34,7 +33,7 @@ impl Character {
                     if let Ok(file) = fs::File::open(def_path) {
                         let reader = BufReader::new(file);
                         let def_info = GenericDef::read(reader);
-                        if let Some(character_info) = read_def(def_info) {
+                        if let Some(character_info) = character_info::read_def(def_info) {
                             let character = Character {
                                 info: character_info,
                                 path: chara_dir_path.to_path_buf(),

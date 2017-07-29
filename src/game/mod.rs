@@ -9,3 +9,7 @@ mod game;
 pub use self::game::Game;
 
 pub mod scene;
+
+pub mod events;
+
+pub mod input;

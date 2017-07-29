@@ -1,5 +1,8 @@
 extern crate sdl2;
 #[macro_use]
+extern crate log;
+extern crate env_logger;
+#[macro_use]
 extern crate gfx;
 extern crate gfx_core;
 extern crate gfx_window_sdl;
@@ -12,6 +15,7 @@ mod game;
 use game::Game;
 
 fn main() {
+    env_logger::init().unwrap();
     let sdl_context = sdl2::init().expect("Unable to initialize SDL2 context.");
     let game = Game::new(&sdl_context);
     game.run();

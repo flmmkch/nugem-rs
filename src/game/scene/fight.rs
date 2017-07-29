@@ -5,6 +5,7 @@ use ::game::graphics::window::Window;
 use ::game::graphics::sprite_displayer;
 use ::game::mugen::format::sff::SffData;
 use ::game::Config;
+use ::game::events;
 
 struct Player {
     pub character: Character,
@@ -14,6 +15,7 @@ struct Player {
 struct FightData {
     pub texture_atlas: sprite_displayer::SpriteTextureAtlas,
     pub sprite_context: sprite_displayer::DrawingContext,
+    pub sprite_canvas: sprite_displayer::SpritesDrawer,
 }
 
 pub struct Fight {
@@ -64,15 +66,33 @@ impl Fight {
         }
         let texture_atlas = sprite_atlas_builder.build(window.factory()).unwrap();
         let sprite_context = sprite_displayer::DrawingContext::new(window.factory());
+        let mut sprite_canvas = sprite_displayer::SpritesDrawer::new();
+        sprite_canvas.add_sprite(0, 0, 60, 75, 75);
+        sprite_canvas.add_sprite(1, 0, 190, 75, 75);
+        sprite_canvas.add_sprite(2, 240, 0, 350, 350);
+        sprite_canvas.add_sprite(3, 240, 400, 350, 350);
         self.loaded_data = Some(FightData {
             texture_atlas,
             sprite_context,
+            sprite_canvas,
         });
     }
 }
 
 impl Scene for Fight {
-    fn update(&mut self, window: &mut Window, _: &Config) -> bool {
+    fn update(&mut self, window: &mut Window, event_queue: &mut events::EventQueue, _: &Config) -> bool {
+        match event_queue.pop() {
+            Some(event) => {
+                match event {
+                    events::Event::Quit => return false,
+                    events::Event::Input(input_event) => {
+                        info!("{:?}", input_event);
+                    },
+                    _ => (),
+                }
+            },
+            None => (),
+        }
         if !self.loaded() {
             self.load(window);
         }
@@ -80,14 +100,12 @@ impl Scene for Fight {
     }
 
     fn display(&mut self, window: &mut Window) {
-        let (factory, encoder, render_target_view) = window.gfx_data();
-        if let Some(ref loaded_data) = self.loaded_data {
-            let mut sprite_canvas = sprite_displayer::SpritesDrawer::new(&self.loaded_data().unwrap().texture_atlas);
-            sprite_canvas.add_sprite(0, 0, 60, 75, 75);
-            sprite_canvas.add_sprite(1, 0, 190, 75, 75);
-            sprite_canvas.add_sprite(2, 240, 0, 350, 350);
-            sprite_canvas.add_sprite(3, 240, 400, 350, 350);
-            sprite_canvas.draw(&loaded_data.sprite_context, factory, encoder, render_target_view);
+        if let Some(loaded_data) = self.loaded_data.as_mut() {
+            let (mut factory, encoder, render_target_view) = window.gfx_data();
+            if !loaded_data.sprite_canvas.is_compiled() {
+                loaded_data.sprite_canvas.compile(&loaded_data.texture_atlas, &mut factory, render_target_view.clone());
+            }
+            loaded_data.sprite_canvas.draw(&loaded_data.sprite_context, &loaded_data.texture_atlas, factory, encoder, render_target_view);
         }
     }
 }

@@ -1,17 +1,18 @@
 use regex::{Regex, Captures};
 use std::io::{BufRead, BufReader, Lines};
+use std::vec;
 
 pub struct GenericDef {
 }
 
-pub struct Category {
-    name: String,
-    key_values: Vec<KeyValue>,
+pub enum DefLine {
+    KeyValue(String, String),
+    Simple(String),
 }
 
-pub struct KeyValue {
-    key: String,
-    value: String,
+pub struct Category {
+    name: String,
+    lines: Vec<DefLine>,
 }
 
 pub struct Categories<T: BufRead> {
@@ -29,7 +30,7 @@ impl<T: BufRead> Iterator for Categories<T> {
         let mut category_has_name = false;
         let mut next_category = false;
         let mut name = String::new();
-        let mut key_values = Vec::new();
+        let mut lines = Vec::new();
         while !(self.file_ended || next_category) {
             match self.lines.next() {
                 Some(Ok(line)) => {
@@ -38,6 +39,7 @@ impl<T: BufRead> Iterator for Categories<T> {
                         static ref CATEGORY_REGEX: Regex = Regex::new("^[ \t]*\\[[ \t]*([^\\]]+?)[ \t]*\\][ \t\r]*(?:;.*)?$").unwrap();
                         static ref KV_QUOTED_REGEX: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*\"([^\r\"]+?)\"[ \t\r]*(?:;.*)?$").unwrap();
                         static ref KV_REGEX: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*([^\r]+?)[ \t\r]*(?:;.*)?$").unwrap();
+                        static ref SIMPLE_REGEX: Regex = Regex::new("^[ \t]*([^\r;]+?)[ \t\r]*(?:;.*)?$").unwrap();
                     }
                     if let Some(c) = CATEGORY_REGEX.captures(&line) {
                         fn captures_to_category_name(captures: Captures) -> String {
@@ -59,22 +61,26 @@ impl<T: BufRead> Iterator for Categories<T> {
                         }
                     }
                     else {
-                        fn captures_to_kv(captures: Captures) -> KeyValue {
-                            let key = captures.get(1).map_or("", |m| m.as_str()).to_owned();
-                            let value = captures.get(2).map_or("", |m| m.as_str()).to_owned();
-                            KeyValue {
-                                key,
-                                value,
-                            }
-                        };
                         if let Some(c) = KV_QUOTED_REGEX.captures(&line) {
-                            key_values.push(captures_to_kv(c));
-                            empty_category = false;
+                            if let Some(l) = DefLine::from_captures(c) {
+                                lines.push(l);
+                                empty_category = false;
+                            }
                         }
                         else {
                             if let Some(c) = KV_REGEX.captures(&line) {
-                                key_values.push(captures_to_kv(c));
-                                empty_category = false;
+                                if let Some(l) = DefLine::from_captures(c) {
+                                    lines.push(l);
+                                    empty_category = false;
+                                }
+                            }
+                            else {
+                                if let Some(c) = SIMPLE_REGEX.captures(&line) {
+                                    if let Some(l) = DefLine::from_captures(c) {
+                                        lines.push(l);
+                                        empty_category = false;
+                                    }
+                                }
                             }
                         }
                     }
@@ -100,10 +106,24 @@ impl<T: BufRead> Iterator for Categories<T> {
         else {
             let category = Category {
                 name,
-                key_values
+                lines,
             };
             self.first_category = false;
             Some(category)
+        }
+    }
+}
+
+impl DefLine {
+    fn from_captures(captures: Captures) -> Option<DefLine> {
+        match captures.len() {
+            2 => Some(DefLine::Simple(captures.get(1).map_or("", |m| m.as_str()).to_owned())),
+            3 => {
+                let key = captures.get(1).map_or("", |m| m.as_str()).to_owned();
+                let value = captures.get(2).map_or("", |m| m.as_str()).to_owned();
+                Some(DefLine::KeyValue(key, value))
+            },
+            _ => None,
         }
     }
 }
@@ -112,17 +132,8 @@ impl Category {
     pub fn name(&self) -> &str {
         self.name.as_str()
     }
-    pub fn key_values(&self) -> &[KeyValue] {
-        &self.key_values[..]
-    }
-}
-
-impl KeyValue {
-    pub fn key(&self) -> &str {
-        self.key.as_str()
-    }
-    pub fn value(&self) -> &str {
-        self.value.as_str()
+    pub fn lines(self) -> vec::IntoIter<DefLine> {
+        self.lines.into_iter()
     }
 }
 

@@ -1,9 +1,10 @@
 use super::Config;
-use sdl2;
 use sdl2::Sdl;
 use ::game::scene;
+use ::game::events;
 use ::game::graphics::window::Window;
 use ::game::mugen::character;
+use ::game::input;
 
 pub struct Game<'a> {
     sdl_context: &'a Sdl,
@@ -21,7 +22,8 @@ impl<'a> Game<'a> {
     pub fn run(&self) {
         let sdl_video = self.sdl_context.video().unwrap();
         let mut window = Window::new(&self.config, &sdl_video);
-        let mut events = self.sdl_context.event_pump().unwrap();
+        let mut input_manager = input::Manager::new(&self.sdl_context);
+        let mut event_queue = events::EventQueue::new(self.sdl_context.event_pump().unwrap());
         let mut current_scene : Box<scene::Scene> = {
             let characters: Vec<character::Character> = self.config.data_paths()
                 .iter()
@@ -35,13 +37,11 @@ impl<'a> Game<'a> {
             Box::new(scene::fight::Fight::new(iter.next().unwrap(), iter.next().unwrap()))
         };
         'main: loop {
-            for event in events.poll_iter() {
-                match event {
-                    sdl2::event::Event::Quit {..} => break 'main,
-                    _ => (),
-                }
+            event_queue.process(&mut input_manager);
+            let continue_main = current_scene.update(&mut window, &mut event_queue, &self.config);
+            if !continue_main {
+                break 'main;
             }
-            current_scene.update(&mut window, &self.config);
             window.clear();
             current_scene.display(&mut window);
             window.update();

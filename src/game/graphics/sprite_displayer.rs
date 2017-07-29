@@ -44,9 +44,9 @@ struct SpriteDrawingCanvas {
     pub y: u32,
 }
 
-pub struct SpritesDrawer<'a> {
-    texture_atlas: &'a SpriteTextureAtlas,
+pub struct SpritesDrawer {
     draw_sprites: Vec<SpriteDrawingCanvas>,
+    buffer_slice: Option<(gfx::handle::Buffer<gfx_types::Resources, Vertex>, gfx::Slice<gfx_types::Resources>)>,
 }
 
 impl TextureAtlasBuilder {
@@ -148,11 +148,11 @@ impl SpriteCanvasInfo {
     }
 }
 
-impl<'a> SpritesDrawer<'a> {
-    pub fn new(texture_atlas: &'a SpriteTextureAtlas) -> SpritesDrawer<'a> {
+impl SpritesDrawer {
+    pub fn new() -> SpritesDrawer {
         SpritesDrawer {
-            texture_atlas,
             draw_sprites: Vec::new(),
+            buffer_slice: None,
         }
     }
     pub fn add_sprite(&mut self, index: usize, x: u32, y: u32, width: u32, height: u32) {
@@ -163,14 +163,18 @@ impl<'a> SpritesDrawer<'a> {
             x,
             y,
         });
+        self.buffer_slice = None;
     }
-    pub fn draw(&self, context: &DrawingContext, factory: &mut gfx_types::Factory, encoder: &mut gfx_types::Encoder, render_target_view: gfx_types::RenderTargetView) {
+    pub fn is_compiled(&self) -> bool {
+        self.buffer_slice.is_some()
+    }
+    pub fn compile(&mut self, texture_atlas: &SpriteTextureAtlas, factory: &mut gfx_types::Factory, render_target_view: gfx_types::RenderTargetView) {
         let mut shape_vertex = Vec::new();
         let dimensions_float = (render_target_view.get_dimensions().0 as f32, render_target_view.get_dimensions().1 as f32);
         for draw_sprite in self.draw_sprites.iter() {
             let texture_corners = {
-                let (v_top, v_bottom) = self.texture_atlas.v_bounds(draw_sprite.index);
-                let (h_left, h_right) = self.texture_atlas.h_bounds(draw_sprite.index);
+                let (v_top, v_bottom) = texture_atlas.v_bounds(draw_sprite.index);
+                let (h_left, h_right) = texture_atlas.h_bounds(draw_sprite.index);
                 (
                     [h_left, v_top], // top left
                     [h_right, v_top], // top right
@@ -197,19 +201,23 @@ impl<'a> SpritesDrawer<'a> {
             shape_vertex.push(Vertex { pos: canvas_corners.3, uv: texture_corners.3 }); // bottom left
             shape_vertex.push(Vertex { pos: canvas_corners.2, uv: texture_corners.2 }); // bottom right
         }
-        let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&shape_vertex[..], ());
-        let sampler = {
-            use gfx::texture;
-            let sampler_info = texture::SamplerInfo::new(texture::FilterMethod::Scale, texture::WrapMode::Tile);
-            factory.create_sampler(sampler_info)
-        };
-        let texture = self.texture_atlas.resource_view().clone();
-        let data = sprite_pipe::Data {
-            vbuf: vertex_buffer,
-            tex: (texture, sampler),
-            out: render_target_view,
-        };
-        encoder.draw(&slice, &context.pso(), &data);
+        self.buffer_slice = Some(factory.create_vertex_buffer_with_slice(&shape_vertex[..], ()));
+    }
+    pub fn draw(&self, context: &DrawingContext, texture_atlas: &SpriteTextureAtlas, factory: &mut gfx_types::Factory, encoder: &mut gfx_types::Encoder, render_target_view: gfx_types::RenderTargetView) {
+        if self.buffer_slice.is_some() {
+            let sampler = {
+                use gfx::texture;
+                let sampler_info = texture::SamplerInfo::new(texture::FilterMethod::Scale, texture::WrapMode::Tile);
+                factory.create_sampler(sampler_info)
+            };
+            let texture = texture_atlas.resource_view().clone();
+            let data = sprite_pipe::Data {
+                vbuf: self.buffer_slice.as_ref().unwrap().0.clone(),
+                tex: (texture, sampler),
+                out: render_target_view,
+            };
+            encoder.draw(&self.buffer_slice.as_ref().unwrap().1, &context.pso(), &data);
+        }
     }
 }
 
