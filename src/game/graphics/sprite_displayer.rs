@@ -203,21 +203,22 @@ impl SpritesDrawer {
         }
         self.buffer_slice = Some(factory.create_vertex_buffer_with_slice(&shape_vertex[..], ()));
     }
-    pub fn draw(&self, context: &DrawingContext, texture_atlas: &SpriteTextureAtlas, factory: &mut gfx_types::Factory, encoder: &mut gfx_types::Encoder, render_target_view: gfx_types::RenderTargetView) {
-        if self.buffer_slice.is_some() {
-            let sampler = {
-                use gfx::texture;
-                let sampler_info = texture::SamplerInfo::new(texture::FilterMethod::Scale, texture::WrapMode::Tile);
-                factory.create_sampler(sampler_info)
-            };
-            let texture = texture_atlas.resource_view().clone();
-            let data = sprite_pipe::Data {
-                vbuf: self.buffer_slice.as_ref().unwrap().0.clone(),
-                tex: (texture, sampler),
-                out: render_target_view,
-            };
-            encoder.draw(&self.buffer_slice.as_ref().unwrap().1, &context.pso(), &data);
+    pub fn draw(&mut self, context: &DrawingContext, texture_atlas: &SpriteTextureAtlas, factory: &mut gfx_types::Factory, encoder: &mut gfx_types::Encoder, render_target_view: gfx_types::RenderTargetView) {
+        if !self.is_compiled() {
+            self.compile(&texture_atlas, factory, render_target_view.clone());
         }
+        let sampler = {
+            use gfx::texture;
+            let sampler_info = texture::SamplerInfo::new(texture::FilterMethod::Scale, texture::WrapMode::Tile);
+            factory.create_sampler(sampler_info)
+        };
+        let texture = texture_atlas.resource_view().clone();
+        let data = sprite_pipe::Data {
+            vbuf: self.buffer_slice.as_ref().unwrap().0.clone(),
+            tex: (texture, sampler),
+            out: render_target_view,
+        };
+        encoder.draw(&self.buffer_slice.as_ref().unwrap().1, &context.pso(), &data);
     }
 }
 

@@ -102,9 +102,6 @@ impl Scene for Fight {
     fn display(&mut self, window: &mut Window) {
         if let Some(loaded_data) = self.loaded_data.as_mut() {
             let (mut factory, encoder, render_target_view) = window.gfx_data();
-            if !loaded_data.sprite_canvas.is_compiled() {
-                loaded_data.sprite_canvas.compile(&loaded_data.texture_atlas, &mut factory, render_target_view.clone());
-            }
             loaded_data.sprite_canvas.draw(&loaded_data.sprite_context, &loaded_data.texture_atlas, factory, encoder, render_target_view);
         }
     }
