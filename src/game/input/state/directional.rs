@@ -63,11 +63,11 @@ impl AcceptInputDirectional for Directional {
             PartialDirectional::FullDirection(direction) => *self = direction,
             PartialDirectional::Horizontal(direction_state) => {
                 let vertical_number = self.number() - (self.number() % 3);
-                let horizontal_number = 1 + direction_state.number();
+                let horizontal_number = direction_state.number();
                 *self = Directional::from_number(vertical_number + horizontal_number).unwrap();
             },
             PartialDirectional::Vertical(direction_state) => {
-                let vertical_number = 1 + (3 * direction_state.number());
+                let vertical_number = 3 * direction_state.number();
                 let horizontal_number = self.number() % 3;
                 *self = Directional::from_number(vertical_number + horizontal_number).unwrap();
             },

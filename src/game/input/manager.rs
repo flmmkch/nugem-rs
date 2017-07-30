@@ -77,10 +77,58 @@ impl Manager {
         self.device_sdl_map.insert(DeviceKey::new(device.device_type(), sdl_id), device_id);
         self.devices.push(device);
     }
-    pub fn process_sdl_event(&self, sdl_event: sdl2::event::Event) -> Option<event::Event> {
+    fn sdl_device_id(&self, sdl_which: i32) -> Option<usize> {
+        if let Some(device_id) = self.device_sdl_map.get(&DeviceKey::new(DeviceType::GameController, sdl_which as usize)) {
+            Some(*device_id)
+        }
+        else {
+            None
+        }
+    }
+    pub fn process_sdl_event(&mut self, sdl_event: sdl2::event::Event) -> Option<event::Event> {
+        macro_rules! process_input_event {
+            ($input_state_option: expr, $input_ident: ident, $which: expr) => (
+                if let Some(input_state) = $input_state_option {
+                    let device_id = self.sdl_device_id($which).unwrap();
+                    let processed_partial_state_opt = {
+                        let mut partial_state = PartialState::new();
+                        partial_state.$input_ident = Some(input_state);
+                        self.devices[device_id].process_state(partial_state)
+                    };
+                    if let Some(partial_state) = processed_partial_state_opt {
+                        let event = event::Event {
+                            device_id,
+                            partial_state,
+                        };
+                        Some(event)
+                    }
+                    else {
+                        None
+                    }
+                }
+                else {
+                    None
+                }
+            )
+        }
+        macro_rules! process_controller_button {
+            ($sdl_button: expr, $partial_state: expr, $button_state: expr) => (
+                match $sdl_button {
+                    sdl2::controller::Button::A => $partial_state.a = Some($button_state),
+                    sdl2::controller::Button::B => $partial_state.b = Some($button_state),
+                    sdl2::controller::Button::LeftShoulder => $partial_state.c = Some($button_state),
+                    sdl2::controller::Button::X => $partial_state.x = Some($button_state),
+                    sdl2::controller::Button::Y => $partial_state.y = Some($button_state),
+                    sdl2::controller::Button::RightShoulder => $partial_state.z = Some($button_state),
+                    sdl2::controller::Button::Start => $partial_state.start = Some($button_state),
+                    sdl2::controller::Button::Back => $partial_state.back = Some($button_state),
+                    _ => (),
+                }
+            )
+        }
         match sdl_event {
             sdl2::event::Event::ControllerAxisMotion {
-                timestamp,
+                timestamp: _,
                 which,
                 axis,
                 value,
@@ -93,6 +141,7 @@ impl Manager {
                             match (positive, negative) {
                                 (true, false) => Some(PartialDirectional::Horizontal(DirectionState::Plus)),
                                 (false, true) => Some(PartialDirectional::Horizontal(DirectionState::Minus)),
+                                (false, false) => Some(PartialDirectional::Horizontal(DirectionState::Neutral)),
                                 _ => None
                             }
                         },
@@ -100,19 +149,28 @@ impl Manager {
                             match (positive, negative) {
                                 (true, false) => Some(PartialDirectional::Vertical(DirectionState::Minus)),
                                 (false, true) => Some(PartialDirectional::Vertical(DirectionState::Plus)),
+                                (false, false) => Some(PartialDirectional::Vertical(DirectionState::Neutral)),
                                 _ => None
                             }
                         },
                         _ => None,
                     }
                 };
-                if let Some(direction_state) = direction_state_option {
-                    let mut partial_state = PartialState::new();
-                    partial_state.directional = Some(direction_state);
+                process_input_event!(direction_state_option, directional, which)
+            },
+            sdl2::event::Event::ControllerButtonDown {
+                timestamp: _,
+                which,
+                button,
+            } => {
+                let mut partial_state = PartialState::new();
+                process_controller_button!(button, partial_state, ButtonState::Down);
+                let device_id = self.sdl_device_id(which).unwrap();
+                let processed_partial_state_opt = self.devices[device_id].process_state(partial_state);
+                if let Some(processed_partial_state) = processed_partial_state_opt {
                     let event = event::Event {
-                        device_id: *self.device_sdl_map.get(&DeviceKey::new(DeviceType::GameController, which as usize)).unwrap(),
-                        timestamp,
-                        partial_state: partial_state,
+                        device_id,
+                        partial_state: processed_partial_state,
                     };
                     Some(event)
                 }
@@ -120,12 +178,26 @@ impl Manager {
                     None
                 }
             },
-            sdl2::event::Event::ControllerButtonDown {
-                ..
-            } => None, // TODO
             sdl2::event::Event::ControllerButtonUp {
-                ..
-            } => None, // TODO
+                timestamp: _,
+                which,
+                button,
+            } => {
+                let mut partial_state = PartialState::new();
+                process_controller_button!(button, partial_state, ButtonState::Up);
+                let device_id = self.sdl_device_id(which).unwrap();
+                let processed_partial_state_opt = self.devices[device_id].process_state(partial_state);
+                if let Some(processed_partial_state) = processed_partial_state_opt {
+                    let event = event::Event {
+                        device_id,
+                        partial_state: processed_partial_state,
+                    };
+                    Some(event)
+                }
+                else {
+                    None
+                }
+            },
             _ => None,
         }
     }
