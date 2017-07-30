@@ -6,6 +6,7 @@ use ::game::graphics::sprite_displayer;
 use ::game::mugen::format::sff::SffData;
 use ::game::Config;
 use ::game::events;
+use ::game::input;
 
 struct Player {
     pub character: Character,
@@ -41,15 +42,9 @@ impl Fight {
             players,
         }
     }
-    
     pub fn loaded(&self) -> bool {
         self.loaded_data.is_some()
     }
-
-    fn loaded_data(&self) -> Option<&FightData> {
-        self.loaded_data.as_ref()
-    }
-
     pub fn load(&mut self, window: &mut Window) {
         let mut sprite_atlas_builder = sprite_displayer::TextureAtlasBuilder::new();
         // small faces
@@ -86,9 +81,12 @@ impl Scene for Fight {
                 match event {
                     events::Event::Quit => return false,
                     events::Event::Input(input_event) => {
+                        // quit on pressing back
+                        if input_event.partial_state.back == Some(input::ButtonState::Down) {
+                            return false;
+                        }
                         info!("{:?}", input_event);
                     },
-                    _ => (),
                 }
             },
             None => (),

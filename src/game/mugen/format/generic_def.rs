@@ -5,11 +5,13 @@ use std::vec;
 pub struct GenericDef {
 }
 
+#[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum DefLine {
     KeyValue(String, String),
     Simple(String),
 }
 
+#[derive(Clone, Debug)]
 pub struct Category {
     name: String,
     lines: Vec<DefLine>,
@@ -38,8 +40,8 @@ impl<T: BufRead> Iterator for Categories<T> {
                     lazy_static! {
                         static ref CATEGORY_REGEX: Regex = Regex::new("^[ \t]*\\[[ \t]*([^\\]]+?)[ \t]*\\][ \t\r]*(?:;.*)?$").unwrap();
                         static ref KV_QUOTED_REGEX: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*\"([^\r\"]+?)\"[ \t\r]*(?:;.*)?$").unwrap();
-                        static ref KV_REGEX: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*([^\r]+?)[ \t\r]*(?:;.*)?$").unwrap();
-                        static ref SIMPLE_REGEX: Regex = Regex::new("^[ \t]*([^\r;]+?)[ \t\r]*(?:;.*)?$").unwrap();
+                        static ref KV_REGEX: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*([^\r]+?)?[ \t\r]*(?:;.*)?$").unwrap();
+                        static ref SIMPLE_REGEX: Regex = Regex::new("^[ \t]*(([^ \r;]+[ \r]?)+?)[ \t\r]*(?:;.*)?$").unwrap();
                     }
                     if let Some(c) = CATEGORY_REGEX.captures(&line) {
                         fn captures_to_category_name(captures: Captures) -> String {
@@ -62,21 +64,21 @@ impl<T: BufRead> Iterator for Categories<T> {
                     }
                     else {
                         if let Some(c) = KV_QUOTED_REGEX.captures(&line) {
-                            if let Some(l) = DefLine::from_captures(c) {
+                            if let Some(l) = DefLine::from_captures(c, true) {
                                 lines.push(l);
                                 empty_category = false;
                             }
                         }
                         else {
                             if let Some(c) = KV_REGEX.captures(&line) {
-                                if let Some(l) = DefLine::from_captures(c) {
+                                if let Some(l) = DefLine::from_captures(c, true) {
                                     lines.push(l);
                                     empty_category = false;
                                 }
                             }
                             else {
                                 if let Some(c) = SIMPLE_REGEX.captures(&line) {
-                                    if let Some(l) = DefLine::from_captures(c) {
+                                    if let Some(l) = DefLine::from_captures(c, false) {
                                         lines.push(l);
                                         empty_category = false;
                                     }
@@ -115,15 +117,19 @@ impl<T: BufRead> Iterator for Categories<T> {
 }
 
 impl DefLine {
-    fn from_captures(captures: Captures) -> Option<DefLine> {
-        match captures.len() {
-            2 => Some(DefLine::Simple(captures.get(1).map_or("", |m| m.as_str()).to_owned())),
-            3 => {
+    fn from_captures(captures: Captures, key_value: bool) -> Option<DefLine> {
+        if captures.len() >= 2 {
+            if key_value {
                 let key = captures.get(1).map_or("", |m| m.as_str()).to_owned();
                 let value = captures.get(2).map_or("", |m| m.as_str()).to_owned();
                 Some(DefLine::KeyValue(key, value))
-            },
-            _ => None,
+            }
+            else {
+                Some(DefLine::Simple(captures.get(1).map_or("", |m| m.as_str()).to_owned()))
+            }
+        }
+        else {
+            None
         }
     }
 }
@@ -134,6 +140,10 @@ impl Category {
     }
     pub fn lines(self) -> vec::IntoIter<DefLine> {
         self.lines.into_iter()
+    }
+    #[allow(dead_code)]
+    pub fn lines_ref(&self) -> &[DefLine] {
+        &self.lines[..]
     }
 }
 
@@ -178,8 +188,9 @@ mod test {
         let categories : Vec<_> = GenericDef::read(Cursor::new(test_string)).collect();
         assert_eq!(categories.len(), 3);
         assert_eq!(categories[0].name(), "info");
-        assert_eq!(categories[0].key_values().len(), 2);
+        println!("{:?}", categories[0].lines_ref());
+        assert_eq!(categories[0].lines_ref().len(), 2);
         assert_eq!(categories[1].name(), "info2");
-        assert_eq!(categories[1].key_values().len(), 3);
+        assert_eq!(categories[1].lines_ref().len(), 3);
     }
 }

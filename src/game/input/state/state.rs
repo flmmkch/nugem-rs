@@ -14,6 +14,22 @@ pub struct State {
     pub back: ButtonState,
 }
 
+impl State {
+    pub fn new() -> State {
+        State {
+            directional: Directional::Neutral,
+            a: ButtonState::Up,
+            b: ButtonState::Up,
+            c: ButtonState::Up,
+            x: ButtonState::Up,
+            y: ButtonState::Up,
+            z: ButtonState::Up,
+            start: ButtonState::Up,
+            back: ButtonState::Up,
+        }
+    }
+}
+
 macro_rules! take_input {
     ($input: ident, $dst_state: expr, $src_state: expr) => (
         if let Some(actual_state) = $src_state.$input {

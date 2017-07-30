@@ -38,12 +38,15 @@ impl EventQueue {
     pub fn push(&mut self, e: Event) {
         self.queue.push_back(e);
     }
+    #[allow(dead_code)]
     pub fn pop(&mut self) -> Option<Event> {
         self.queue.pop_front()
     }
+    #[allow(dead_code)]
     pub fn peek(&self) -> Option<&Event> {
         self.queue.front()
     }
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }

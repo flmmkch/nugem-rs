@@ -11,14 +11,14 @@ use super::{AcceptInputDirectional, DirectionState, PartialDirectional};
 /// 0 1 2
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum Directional {
-    North,
-    NorthEast,
-    East, 
-    SouthEast,
-    South,
-    SouthWest,
-    West,
-    NorthWest,
+    Up,
+    UpForward,
+    Forward, 
+    DownForward,
+    Down,
+    DownBackward,
+    Backward,
+    UpBackward,
     Neutral,
 }
 
@@ -30,27 +30,27 @@ impl Directional {
     }
     pub fn number(&self) -> u8 {
         match *self {
-            Directional::North => 7,
-            Directional::NorthEast => 8,
-            Directional::East => 5,
-            Directional::SouthEast => 2,
-            Directional::South => 1,
-            Directional::SouthWest => 0,
-            Directional::West => 3,
-            Directional::NorthWest => 6,
+            Directional::Up => 7,
+            Directional::UpForward => 8,
+            Directional::Forward => 5,
+            Directional::DownForward => 2,
+            Directional::Down => 1,
+            Directional::DownBackward => 0,
+            Directional::Backward => 3,
+            Directional::UpBackward => 6,
             Directional::Neutral => 4,
         }
     }
     pub fn from_number(number: u8) -> Option<Directional> {
         match number {
-            7 => Some(Directional::North),
-            8 => Some(Directional::NorthEast),
-            5 => Some(Directional::East),
-            2 => Some(Directional::SouthEast),
-            1 => Some(Directional::South),
-            0 => Some(Directional::SouthWest),
-            3 => Some(Directional::West),
-            6 => Some(Directional::NorthWest),
+            7 => Some(Directional::Up),
+            8 => Some(Directional::UpForward),
+            5 => Some(Directional::Forward),
+            2 => Some(Directional::DownForward),
+            1 => Some(Directional::Down),
+            0 => Some(Directional::DownBackward),
+            3 => Some(Directional::Backward),
+            6 => Some(Directional::UpBackward),
             4 => Some(Directional::Neutral),
             _ => None,
         }

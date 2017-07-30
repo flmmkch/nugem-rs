@@ -11,7 +11,7 @@ pub enum PartialDirectional {
 impl AcceptInputDirectional for PartialDirectional {
     fn accept(&mut self, partial_directional: PartialDirectional) {
         match partial_directional {
-            PartialDirectional::FullDirection(directional) => *self = partial_directional,
+            PartialDirectional::FullDirection(_) => *self = partial_directional,
             PartialDirectional::Horizontal(input_h) => {
                 match *self {
                     PartialDirectional::FullDirection(ref mut directional) => directional.accept(partial_directional),

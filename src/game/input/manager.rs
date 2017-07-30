@@ -72,17 +72,7 @@ impl Manager {
     fn add_game_controller(&mut self, sdl_game_controller: sdl2::controller::GameController, sdl_id: usize) {
         let name = sdl_game_controller.name();
         // TODO: read initial state better
-        let initial_state = State {
-            directional: Directional::Neutral,
-            a: ButtonState::Up,
-            b: ButtonState::Up,
-            c: ButtonState::Up,
-            x: ButtonState::Up,
-            y: ButtonState::Up,
-            z: ButtonState::Up,
-            start: ButtonState::Up,
-            back: ButtonState::Up,
-        };
+        let initial_state = State::new();
         let device = Device::new(DeviceType::GameController, name, initial_state, DeviceInternal::GameController(sdl_game_controller));
         self.add_device(device, sdl_id);
     }

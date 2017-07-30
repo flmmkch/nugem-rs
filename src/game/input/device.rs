@@ -5,8 +5,6 @@ use std::fmt;
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum DeviceType {
     GameController,
-    Joystick,
-    Keyboard,
 }
 
 #[derive(Debug)]
@@ -19,7 +17,6 @@ pub struct Device {
 }
 
 pub enum DeviceInternal {
-    None,
     GameController(sdl2::controller::GameController),
 }
 
@@ -35,6 +32,7 @@ impl Device {
     pub fn device_type(&self) -> DeviceType {
         self.device_type
     }
+    #[allow(dead_code)]
     pub fn state(&self) -> &State {
         &self.current_state
     }
@@ -54,7 +52,6 @@ impl fmt::Debug for DeviceInternal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let self_string = {
             match *self {
-                DeviceInternal::None => "None",
                 DeviceInternal::GameController(_) => "GameController(..)"
             }
         };
