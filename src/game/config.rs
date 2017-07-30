@@ -5,14 +5,17 @@ pub struct Config {
     data_paths: Vec<PathBuf>,
     window_size: (u32, u32),
     fullscreen: bool,
+    ticks_per_second: u32,
 }
 
 const DEFAULT_WINDOW_WIDTH : u32 = 800;
 const DEFAULT_WINDOW_HEIGHT : u32 = 600;
 const DEFAULT_FULLSCREEN : bool = false;
+const DEFAULT_TICKS_PER_SECOND : u32 = 60;
 
 impl Config {
     pub fn new() -> Config {
+        let ticks_per_second = DEFAULT_TICKS_PER_SECOND;
         let mut data_paths = Vec::new();
         data_paths.push(PathBuf::from("./"));
         let mut window_size = (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
@@ -58,6 +61,7 @@ impl Config {
             data_paths,
             window_size,
             fullscreen,
+            ticks_per_second,
         }
     }
     pub fn data_paths(&self) -> &[PathBuf] {
@@ -68,5 +72,8 @@ impl Config {
     }
     pub fn fullscreen(&self) -> bool {
         self.fullscreen
+    }
+    pub fn ticks_per_second(&self) -> u32 {
+        self.ticks_per_second
     }
 }

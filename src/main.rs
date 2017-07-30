@@ -10,6 +10,7 @@ extern crate gfx_device_gl;
 extern crate regex;
 #[macro_use]
 extern crate lazy_static;
+extern crate game_time;
 
 mod game;
 use game::Game;
