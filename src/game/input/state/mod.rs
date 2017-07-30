@@ -1,3 +1,6 @@
+mod button;
+pub use self::button::Button;
+
 mod button_state;
 pub use self::button_state::ButtonState;
 
@@ -7,11 +10,11 @@ pub use self::direction_state::DirectionState;
 mod directional;
 pub use self::directional::Directional;
 
-mod state;
-pub use self::state::State;
-
 mod partial_directional;
 pub use self::partial_directional::PartialDirectional;
+
+mod state;
+pub use self::state::State;
 
 mod partial_state;
 pub use self::partial_state::PartialState;

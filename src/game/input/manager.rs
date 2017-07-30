@@ -17,6 +17,20 @@ struct DeviceKey {
     sdl_id: usize,
 }
 
+fn controller_button(sdl_button: sdl2::controller::Button) -> Option<Button> {
+    match sdl_button {
+        sdl2::controller::Button::A => Some(Button::A),
+        sdl2::controller::Button::B => Some(Button::B),
+        sdl2::controller::Button::LeftShoulder => Some(Button::C),
+        sdl2::controller::Button::X => Some(Button::X),
+        sdl2::controller::Button::Y => Some(Button::Y),
+        sdl2::controller::Button::RightShoulder => Some(Button::Z),
+        sdl2::controller::Button::Start => Some(Button::Start),
+        sdl2::controller::Button::Back => Some(Button::Back),
+        _ => None,
+    }
+}
+
 pub const SDL_AXIS_THRESHOLD : i16 = 32767 / 3;
 
 impl Manager {
@@ -87,12 +101,12 @@ impl Manager {
     }
     pub fn process_sdl_event(&mut self, sdl_event: sdl2::event::Event) -> Option<event::Event> {
         macro_rules! process_input_event {
-            ($input_state_option: expr, $input_ident: ident, $which: expr) => (
-                if let Some(input_state) = $input_state_option {
+            ($input_option: expr, $input_ident: ident, $which: expr) => (
+                if let Some(input) = $input_option {
                     let device_id = self.sdl_device_id($which).unwrap();
                     let processed_partial_state_opt = {
                         let mut partial_state = PartialState::new();
-                        partial_state.$input_ident = Some(input_state);
+                        partial_state.$input_ident = Some(input);
                         self.devices[device_id].process_state(partial_state)
                     };
                     if let Some(partial_state) = processed_partial_state_opt {
@@ -111,18 +125,17 @@ impl Manager {
                 }
             )
         }
-        macro_rules! process_controller_button {
-            ($sdl_button: expr, $partial_state: expr, $button_state: expr) => (
-                match $sdl_button {
-                    sdl2::controller::Button::A => $partial_state.a = Some($button_state),
-                    sdl2::controller::Button::B => $partial_state.b = Some($button_state),
-                    sdl2::controller::Button::LeftShoulder => $partial_state.c = Some($button_state),
-                    sdl2::controller::Button::X => $partial_state.x = Some($button_state),
-                    sdl2::controller::Button::Y => $partial_state.y = Some($button_state),
-                    sdl2::controller::Button::RightShoulder => $partial_state.z = Some($button_state),
-                    sdl2::controller::Button::Start => $partial_state.start = Some($button_state),
-                    sdl2::controller::Button::Back => $partial_state.back = Some($button_state),
-                    _ => (),
+        macro_rules! process_input_button {
+            ($input_state_option: expr, $input_button: expr, $which: expr) => (
+                match $input_button {
+                    Button::A => process_input_event!($input_state_option, a, $which),
+                    Button::B => process_input_event!($input_state_option, b, $which),
+                    Button::C => process_input_event!($input_state_option, c, $which),
+                    Button::X => process_input_event!($input_state_option, x, $which),
+                    Button::Y => process_input_event!($input_state_option, y, $which),
+                    Button::Z => process_input_event!($input_state_option, z, $which),
+                    Button::Start => process_input_event!($input_state_option, start, $which),
+                    Button::Back => process_input_event!($input_state_option, back, $which),
                 }
             )
         }
@@ -163,16 +176,8 @@ impl Manager {
                 which,
                 button,
             } => {
-                let mut partial_state = PartialState::new();
-                process_controller_button!(button, partial_state, ButtonState::Down);
-                let device_id = self.sdl_device_id(which).unwrap();
-                let processed_partial_state_opt = self.devices[device_id].process_state(partial_state);
-                if let Some(processed_partial_state) = processed_partial_state_opt {
-                    let event = event::Event {
-                        device_id,
-                        partial_state: processed_partial_state,
-                    };
-                    Some(event)
+                if let Some(input_button) = controller_button(button) {
+                    process_input_button!(Some(ButtonState::Down), input_button, which)
                 }
                 else {
                     None
@@ -183,16 +188,8 @@ impl Manager {
                 which,
                 button,
             } => {
-                let mut partial_state = PartialState::new();
-                process_controller_button!(button, partial_state, ButtonState::Up);
-                let device_id = self.sdl_device_id(which).unwrap();
-                let processed_partial_state_opt = self.devices[device_id].process_state(partial_state);
-                if let Some(processed_partial_state) = processed_partial_state_opt {
-                    let event = event::Event {
-                        device_id,
-                        partial_state: processed_partial_state,
-                    };
-                    Some(event)
+                if let Some(input_button) = controller_button(button) {
+                    process_input_button!(Some(ButtonState::Up), input_button, which)
                 }
                 else {
                     None
