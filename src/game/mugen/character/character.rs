@@ -4,8 +4,10 @@ use std::io::BufReader;
 use ::game::mugen::format::generic_def::GenericDef;
 use super::character_info::{self, CharacterInfo};
 use ::game::mugen::format::sff;
+use ::game::mugen::character::air::{read_air_file, Animation};
+use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Character {
     info: CharacterInfo,
     path: PathBuf,
@@ -59,6 +61,11 @@ impl Character {
         else {
             Err(sff::Error::FileOpeningError(sprite_path))
         }
+    }
+    pub fn read_animations(&self) -> HashMap<u32, Animation> {
+        let sprite_path = self.path.join(Path::new(&self.info["files"]["anim"]));
+        let file = fs::File::open(&sprite_path).unwrap(); // TODO don't use unwrap
+        read_air_file(file)
     }
 }
 

@@ -38,12 +38,12 @@ impl<T: BufRead> Iterator for Categories<T> {
                 Some(Ok(line)) => {
                     // read the next category
                     lazy_static! {
-                        static ref CATEGORY_REGEX: Regex = Regex::new("^[ \t]*\\[[ \t]*([^\\]]+?)[ \t]*\\][ \t\r]*(?:;.*)?$").unwrap();
-                        static ref KV_QUOTED_REGEX: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*\"([^\r\"]+?)\"[ \t\r]*(?:;.*)?$").unwrap();
-                        static ref KV_REGEX: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*([^\r]+?)?[ \t\r]*(?:;.*)?$").unwrap();
-                        static ref SIMPLE_REGEX: Regex = Regex::new("^[ \t]*(([^ \r;]+[ \r]?)+?)[ \t\r]*(?:;.*)?$").unwrap();
+                        static ref REGEX_CATEGORY: Regex = Regex::new("^[ \t]*\\[[ \t]*([^\\]]+?)[ \t]*\\][ \t\r]*(?:;.*)?$").unwrap();
+                        static ref REGEX_KV_QUOTED: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*\"([^\r\"]+?)\"[ \t\r]*(?:;.*)?$").unwrap();
+                        static ref REGEX_KV: Regex = Regex::new("^[ \t]*([^=]+?)[ \t]*=[ \t]*([^\r]+?)?[ \t\r]*(?:;.*)?$").unwrap();
+                        static ref REGEX_SIMPLE: Regex = Regex::new("^[ \t]*(([^ \r;]+[ \r]?)+?)[ \t\r]*(?:;.*)?$").unwrap();
                     }
-                    if let Some(c) = CATEGORY_REGEX.captures(&line) {
+                    if let Some(c) = REGEX_CATEGORY.captures(&line) {
                         fn captures_to_category_name(captures: Captures) -> String {
                             captures.get(1).map_or("", |m| m.as_str()).to_owned()
                         };
@@ -63,21 +63,21 @@ impl<T: BufRead> Iterator for Categories<T> {
                         }
                     }
                     else {
-                        if let Some(c) = KV_QUOTED_REGEX.captures(&line) {
+                        if let Some(c) = REGEX_KV_QUOTED.captures(&line) {
                             if let Some(l) = DefLine::from_captures(c, true) {
                                 lines.push(l);
                                 empty_category = false;
                             }
                         }
                         else {
-                            if let Some(c) = KV_REGEX.captures(&line) {
+                            if let Some(c) = REGEX_KV.captures(&line) {
                                 if let Some(l) = DefLine::from_captures(c, true) {
                                     lines.push(l);
                                     empty_category = false;
                                 }
                             }
                             else {
-                                if let Some(c) = SIMPLE_REGEX.captures(&line) {
+                                if let Some(c) = REGEX_SIMPLE.captures(&line) {
                                     if let Some(l) = DefLine::from_captures(c, false) {
                                         lines.push(l);
                                         empty_category = false;

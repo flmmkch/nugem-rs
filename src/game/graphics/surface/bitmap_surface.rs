@@ -1,6 +1,6 @@
 use super::BitmapPixel;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BitmapSurface {
     w: usize,
     h: usize,

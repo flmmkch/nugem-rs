@@ -14,7 +14,7 @@ extern crate game_time;
 #[macro_use]
 extern crate nom;
 
-mod game;
+pub mod game;
 use game::Game;
 
 fn main() {

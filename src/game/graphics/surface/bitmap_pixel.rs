@@ -1,6 +1,4 @@
-#[derive(Clone)]
-#[derive(Debug)]
-#[derive(Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BitmapPixel(u8, u8, u8, u8);
 
 impl BitmapPixel {

@@ -254,7 +254,7 @@ impl Data {
                                 // long LZ packet
                                 // since the 0x3F-masked bits are null, there are only the 0xC0-masked bits left
                                 // take the highest 2 bits of the 10-bit offset
-                                offset = ((sprite_data[data_index] as usize) + 1) << 2;
+                                offset = 1 + ((sprite_data[data_index] as usize) << 2);
                                 data_index += 1;
                                 // take the lowest 8 bits of the 10-bit offset, plus one
                                 offset = offset | (1 + (sprite_data[data_index] as usize));
@@ -272,7 +272,11 @@ impl Data {
                             // so that is why the offset has a factor here
                             if offset > 0 {
                                 for current_pixel_index in 0..copy_length {
-                                    let offset_from_beginning = offset * (1 + current_pixel_index / offset);
+                                    use std::cmp;
+                                    let offset_from_beginning = cmp::min(
+                                        offset * (1 + current_pixel_index / offset),
+                                        pixel_index
+                                    );
                                     surface.pixels_mut()[pixel_index] = surface.pixels()[pixel_index - offset_from_beginning];
                                     pixel_index += 1;
                                 }

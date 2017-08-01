@@ -1,5 +1,6 @@
 use super::Scene;
 use ::game::mugen::character::Character;
+use ::game::mugen::character::air;
 use ::game::mugen::format;
 use ::game::graphics::window::Window;
 use ::game::graphics::sprite_displayer;
@@ -7,10 +8,24 @@ use ::game::mugen::format::sff::SffData;
 use ::game::Config;
 use ::game::events;
 use ::game::input;
+use std::collections::{BTreeMap, HashMap};
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+struct ImageKey {
+    group: u16,
+    image: u16,
+}
 
 struct Player {
     pub character: Character,
-    pub char_data: format::sff::Data,
+    pub image_keys: HashMap<ImageKey, usize>,
+    pub animations: Vec<air::Animation>,
+    pub current_animation: usize,
+    pub current_step: usize,
+    pub tick_timer: u16,
+    pub big_face: usize,
+    pub small_face: usize,
+    pub sprite_id: usize,
 }
 
 struct FightData {
@@ -26,10 +41,16 @@ pub struct Fight {
 
 impl Player {
     pub fn new(character: Character) -> Player {
-        let char_data = character.read_data().unwrap();
         Player {
             character,
-            char_data,
+            image_keys: HashMap::new(),
+            animations: Vec::new(),
+            current_animation: 0,
+            current_step: 0,
+            tick_timer: 0,
+            big_face: 0,
+            small_face: 0,
+            sprite_id: 0,
         }
     }
 }
@@ -47,25 +68,47 @@ impl Fight {
     }
     pub fn load(&mut self, window: &mut Window) {
         let mut sprite_atlas_builder = sprite_displayer::TextureAtlasBuilder::new();
-        // small faces
-        for player in self.players.iter() {
-            if let Some(s) = player.char_data.render_sprite(9000, 0, 0) {
-                sprite_atlas_builder.add_surface(s);
-            }
-        }
-        // big faces
-        for player in self.players.iter() {
-            if let Some(s) = player.char_data.render_sprite(9000, 1, 0) {
-                sprite_atlas_builder.add_surface(s);
+        for player in self.players.iter_mut() {
+            let char_data = player.character.read_data().unwrap();
+            player.small_face = sprite_atlas_builder.add_surface(char_data.render_sprite(9000, 0, 0).unwrap());
+            player.big_face = sprite_atlas_builder.add_surface(char_data.render_sprite(9000, 1, 0).unwrap());
+            // btreemap for it to be in order
+            let animations : BTreeMap<u32, air::Animation> = player.character.read_animations().into_iter().collect();
+            for (_, animation) in animations {
+                for ref frame in animation.steps()[0].frames() {
+                    let key = ImageKey {
+                        group: frame.group,
+                        image: frame.image,
+                    };
+                    if player.image_keys.get(&key) == None {
+                        if let Some(rendered_sprite) = char_data.render_sprite(key.group, key.image, 0) {
+                            let image_id = sprite_atlas_builder.add_surface(rendered_sprite);
+                            player.image_keys.insert(key, image_id);
+                        }
+                    }
+                }
+                player.animations.push(animation);
+                break;
             }
         }
         let texture_atlas = sprite_atlas_builder.build(window.factory()).unwrap();
         let sprite_context = sprite_displayer::DrawingContext::new(window.factory());
         let mut sprite_canvas = sprite_displayer::SpritesDrawer::new();
-        sprite_canvas.add_sprite(0, 0, 60, 75, 75);
-        sprite_canvas.add_sprite(1, 0, 190, 75, 75);
-        sprite_canvas.add_sprite(2, 240, 0, 350, 350);
-        sprite_canvas.add_sprite(3, 240, 400, 350, 350);
+        for i in 0..self.players.len() {
+            let player = &mut self.players[i];
+            let sprite_id = {
+                let current_animation = &player.animations[player.current_animation];
+                let current_frame = &current_animation.steps()[0].frames()[player.current_step];
+                let key = ImageKey {
+                    group: current_frame.group,
+                    image: current_frame.image,
+                };
+                *player.image_keys.get(&key).unwrap()
+            };
+            let (w, h) = texture_atlas.dimensions(sprite_id);
+            sprite_canvas.add_sprite(player.big_face, (50 + i * 300) as u32, 450, 175, 175);
+            player.sprite_id = sprite_canvas.add_sprite(sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+        }
         self.loaded_data = Some(FightData {
             texture_atlas,
             sprite_context,
@@ -85,7 +128,6 @@ impl Scene for Fight {
                         if input_event.partial_state.back == Some(input::ButtonState::Down) {
                             return false;
                         }
-                        info!("{:?}", input_event);
                     },
                 }
             },
@@ -100,6 +142,31 @@ impl Scene for Fight {
     fn display(&mut self, window: &mut Window) {
         if let Some(loaded_data) = self.loaded_data.as_mut() {
             let (mut factory, encoder, render_target_view) = window.gfx_data();
+            for i in 0..self.players.len() {
+                let player = &mut self.players[i];
+                let current_animation = &player.animations[player.current_animation];
+                if player.tick_timer == 0 {
+                    player.current_step += 1;
+                    if player.current_step == current_animation.steps()[0].frames().len() {
+                        player.current_step = 0;
+                    }
+                    let new_frame = &current_animation.steps()[0].frames()[player.current_step];
+                    player.tick_timer = new_frame.ticks.unwrap_or(1);
+                    // change frame
+                    let sprite_id = {
+                        let key = ImageKey {
+                            group: new_frame.group,
+                            image: new_frame.image,
+                        };
+                        *player.image_keys.get(&key).unwrap()
+                    };
+                    let (w, h) = loaded_data.texture_atlas.dimensions(sprite_id);
+                    loaded_data.sprite_canvas.update_canvas(player.sprite_id, sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                }
+                else {
+                    player.tick_timer -= 1;
+                }
+            }
             loaded_data.sprite_canvas.draw(&loaded_data.sprite_context, &loaded_data.texture_atlas, factory, encoder, render_target_view);
         }
     }
