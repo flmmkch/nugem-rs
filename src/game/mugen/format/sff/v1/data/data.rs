@@ -79,7 +79,7 @@ impl Data {
             match pcx::read_pcx_surface(cursor, palette.borrow()) {
                 Ok(surface) => Some(surface),
                 Err(e) => {
-                    println!("Error reading PCX surface: {:?}", e);
+                    error!("Error reading PCX surface: {:?}", e);
                     None
                 }
             }

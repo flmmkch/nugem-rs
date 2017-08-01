@@ -1,9 +1,7 @@
 use ::game::graphics::surface::BitmapPixel;
 use std::fmt;
 
-#[derive(Debug)]
-#[derive(Clone)]
-#[derive(Copy)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Color {
     Rgb(u8, u8,u8),
     Transparent,
