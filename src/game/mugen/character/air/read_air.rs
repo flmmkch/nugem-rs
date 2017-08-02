@@ -19,6 +19,7 @@ pub fn read_air_file(cmd_file: File) -> HashMap<u32, Animation>  {
                     // let mut default_normal_collision = None;
                     // let mut default_attack_collision = None;
                     let mut current_animation_frames = Vec::new();
+                    let mut looping_frame = None;
                     while let Some(line) = line_iterator.next() {
                         lazy_static! {
                             static ref REGEX_CLSN_DEFAULT: Regex = Regex::new(r"^Clsn(1|2)Default: ([0-9]+)$").unwrap();
@@ -34,29 +35,37 @@ pub fn read_air_file(cmd_file: File) -> HashMap<u32, Animation>  {
                                 if let Some(collision_default) = REGEX_CLSN_DEFAULT.captures(&line_string.as_str()) {
                                 }
                                 else {
-                                    // try for a frame line
-                                    let strings: Vec<&str> = line_string.split(',').collect();
-                                    if strings.len() >= 5 {
-                                        let group_res = strings[0].trim().parse();
-                                        let image_res = strings[1].trim().parse();
-                                        let offset_x_res = strings[2].trim().parse();
-                                        let offset_y_res = strings[3].trim().parse();
-                                        let ticks_res = strings[4].trim().parse();
-                                        if group_res.is_ok() && image_res.is_ok() && offset_x_res.is_ok() && offset_y_res.is_ok() && ticks_res.is_ok() {
-                                            current_animation_frames.push(AnimationFrame {
-                                                group: group_res.unwrap(),
-                                                image: image_res.unwrap(),
-                                                offset: (offset_x_res.unwrap(), offset_y_res.unwrap()),
-                                                ticks: Some(ticks_res.unwrap()),
-                                                flip: (false, false),
-                                            });
-                                        }
+                                    match line_string.as_str() {
+                                        "Loopstart" => {
+                                            // TODO implement different steps
+                                            looping_frame = Some((0, current_animation_frames.len()));
+                                        },
+                                        _ => {
+                                            // try for a frame line
+                                            let strings: Vec<&str> = line_string.split(',').collect();
+                                            if strings.len() >= 5 {
+                                                let group_res = strings[0].trim().parse();
+                                                let image_res = strings[1].trim().parse();
+                                                let offset_x_res = strings[2].trim().parse();
+                                                let offset_y_res = strings[3].trim().parse();
+                                                let ticks_res = strings[4].trim().parse();
+                                                if group_res.is_ok() && image_res.is_ok() && offset_x_res.is_ok() && offset_y_res.is_ok() && ticks_res.is_ok() {
+                                                    current_animation_frames.push(AnimationFrame {
+                                                        group: group_res.unwrap(),
+                                                        image: image_res.unwrap(),
+                                                        offset: (offset_x_res.unwrap(), offset_y_res.unwrap()),
+                                                        ticks: Some(ticks_res.unwrap()),
+                                                        flip: (false, false),
+                                                    });
+                                                }
+                                            }
+                                        },
                                     }
                                 }
                             }
                         }
                     }
-                    let animation = Animation::new(vec![AnimationSteps::new(Vec::new(), current_animation_frames)]);
+                    let animation = Animation::new(vec![AnimationSteps::new(Vec::new(), current_animation_frames)], looping_frame);
                     result_map.insert(number, animation);
                 }
             }

@@ -3,7 +3,7 @@ use sdl2::Sdl;
 use ::game::scene;
 use ::game::events;
 use ::game::graphics::window::Window;
-use ::game::mugen::character;
+use ::game::scene::Scene;
 use ::game::input;
 use game_time::{GameClock, FrameCounter, FrameCount};
 use game_time::framerate::RunningAverageSampler;
@@ -27,18 +27,7 @@ impl<'a> Game<'a> {
         let mut window = Window::new(&self.config, &sdl_video);
         let mut input_manager = input::Manager::new(&self.sdl_context);
         let mut event_queue = events::EventQueue::new(self.sdl_context.event_pump().unwrap());
-        let mut current_scene : Box<scene::Scene> = {
-            let characters: Vec<character::Character> = self.config.data_paths()
-                .iter()
-                .map(|data_path| { character::find_characters(data_path) })
-                .filter_map(|char_dir| { char_dir })
-                .fold(Vec::new(), |mut v, character_dir| {
-                    v.extend(character_dir);
-                    v
-                });
-            let mut iter = characters.into_iter();
-            Box::new(scene::fight::Fight::new(iter.next().unwrap(), iter.next().unwrap()))
-        };
+        let mut current_scene = Box::new(scene::fight::Fight::new(&self.config));
         let mut clock = GameClock::new();
         let mut counter = FrameCounter::new(self.config.ticks_per_second() as f64, RunningAverageSampler::with_max_samples(self.config.ticks_per_second() * 15 / 10));
         'main: loop {

@@ -1,6 +1,7 @@
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub struct Animation {
     steps: Vec<AnimationSteps>,
+    looping_frame: Option<(usize, usize)>,
 }
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -31,13 +32,17 @@ pub struct AnimationFrame {
 }
 
 impl Animation {
-    pub fn new(steps: Vec<AnimationSteps>) -> Animation {
+    pub fn new(steps: Vec<AnimationSteps>, looping_frame: Option<(usize, usize)>) -> Animation {
         Animation {
             steps,
+            looping_frame,
         }
     }
     pub fn steps(&self) -> &[AnimationSteps] {
         &self.steps[..]
+    }
+    pub fn looping_frame(&self) -> Option<(usize, usize)> {
+        self.looping_frame.clone()
     }
 }
 
