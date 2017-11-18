@@ -1,22 +1,22 @@
 use super::{Palette, Color};
 use ::game::graphics::surface::BitmapSurface;
 use std::io::{Read, Seek, SeekFrom};
-use super::super::super::{read_u16, read_u8};
 use super::super::Error;
+use byteorder::{LittleEndian, ReadBytesExt};
 
 pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Result<BitmapSurface, Error> {
     // PCX file format:
     // reading the PCX header
     // byte 0: manufacturer, must be 0x0A
     {
-        let manufacturer = read_u8(&mut reader)?;
+        let manufacturer = reader.read_u8()?;
         if manufacturer != 0x0A {
             return Err(Error::InvalidPcxData(format!("Bad manufacturer byte: 0x{:0X}", manufacturer)));
         }
     }
     // byte 1: PCX Paintbrush version
     {
-        let paintbrush = read_u8(&mut reader)?;
+        let paintbrush = reader.read_u8()?;
         match paintbrush {
             0 |         // version 2.5
             2 |         // version 2.8 with palette
@@ -27,7 +27,7 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
     }
     // byte 2: encoding
     let using_rle = {
-        let encoding_byte = read_u8(&mut reader)?;
+        let encoding_byte = reader.read_u8()?;
         match encoding_byte {
             0 => false, // uncompressed image
             1 => true, // PCX format run-length encoding
@@ -37,7 +37,7 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
     // byte 3: bits per pixel
     // number of bits per pixel in each color plane: 1, 2, 4, 8, 24
     let bits_per_pixel = {
-        let bpp_byte = read_u8(&mut reader)?;
+        let bpp_byte = reader.read_u8()?;
         match bpp_byte {
             1 | 2 | 4 | 8 | 24 => bpp_byte as u16,
             _ => return Err(Error::InvalidPcxData(format!("Invalid bits per plane: {}", bpp_byte))),
@@ -46,10 +46,10 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
     // bytes 4 - 10: image size
     // width
     let (width, height) = {
-        let x_min = read_u16(&mut reader)?;
-        let y_min = read_u16(&mut reader)?;
-        let x_max = read_u16(&mut reader)?;
-        let y_max = read_u16(&mut reader)?;
+        let x_min = reader.read_u16::<LittleEndian>()?;
+        let y_min = reader.read_u16::<LittleEndian>()?;
+        let x_max = reader.read_u16::<LittleEndian>()?;
+        let y_max = reader.read_u16::<LittleEndian>()?;
         (x_max - x_min + 1, y_max - y_min + 1)
     };
     // skipped data
@@ -61,14 +61,14 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
     reader.seek(SeekFrom::Current(48))?;
     // 64: reserved: should be set to 0
     {
-        let reserved_byte = read_u8(&mut reader)?;
+        let reserved_byte = reader.read_u8()?;
         match reserved_byte {
             0 => (),
             _ => return Err(Error::InvalidPcxData(format!("Bad reserved byte: 0x{:0X}", reserved_byte))),
         }
     }
     // 65: number of color planes
-    let bit_planes = (read_u8(&mut reader)?) as u16;
+    let bit_planes = (reader.read_u8()?) as u16;
     // 66 - 67: bytes per plane for a line
     reader.seek(SeekFrom::Current(2))?;
     // 68 - 69: palette type
@@ -93,11 +93,11 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
                 let mut reset_scanline = false;
                 let (mut run_length, color_index) = {
                     if scanline_position < scanline_length {
-                        let first_byte = read_u8(&mut reader)?;
+                        let first_byte = reader.read_u8()?;
                         // if it's a RLE byte
                         if (first_byte & 0xC0) == 0xC0 {
                             let run_length = first_byte & 0x3F;
-                            let second_byte = read_u8(&mut reader)?;
+                            let second_byte = reader.read_u8()?;
                             (run_length as usize, second_byte as usize)
                         }
                         else {
@@ -136,7 +136,7 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
         else {
             // if it's raw pixels
             for pixel_index in 0..max_pixel {
-                let color_byte = read_u8(&mut reader)?;
+                let color_byte = reader.read_u8()?;
                 surface.pixels_mut()[pixel_index] = palette.colors[color_byte as usize].into();
             }
         }

@@ -13,6 +13,7 @@ extern crate lazy_static;
 extern crate game_time;
 #[macro_use]
 extern crate nom;
+extern crate byteorder;
 
 pub mod game;
 use game::Game;
