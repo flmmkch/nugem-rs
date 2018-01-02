@@ -15,7 +15,7 @@ pub mod gfx_types {
     pub type Encoder = gfx::Encoder<Resources, gfx_device_gl::CommandBuffer>;
     pub type Factory = gfx_device_gl::Factory;
     pub type Device = gfx_device_gl::Device;
-    pub type RenderFormat = gfx_core::format::Srgba8;
+    pub type RenderFormat = gfx_core::format::Rgba8;
     pub type DepthFormat = gfx_core::format::DepthStencil;
     pub type RenderTargetView = gfx_core::handle::RenderTargetView<Resources, RenderFormat>;
     pub type DepthView = gfx_core::handle::DepthStencilView<Resources, (gfx_core::format::D24_S8, gfx_core::format::Unorm)>;

@@ -25,7 +25,7 @@ impl Window {
             if config.fullscreen() {
                 window_builder.fullscreen();
             }
-            gfx_window_sdl::init::<gfx_types::RenderFormat, gfx_types::DepthFormat>(window_builder).expect("gfx_window_sdl::init failed!")
+            gfx_window_sdl::init::<gfx_types::RenderFormat, gfx_types::DepthFormat>(sdl_video, window_builder).expect("gfx_window_sdl::init failed!")
         };
         let encoder : gfx_types::Encoder = factory.create_command_buffer().into();
         Window {

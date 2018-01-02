@@ -14,7 +14,7 @@ gfx_defines!{
     pipeline sprite_pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         tex: gfx::TextureSampler<[f32; 4]> = "t_Texture",
-        out: gfx::BlendTarget<gfx_types::RenderFormat> = ("Target0", gfx::state::MASK_ALL, gfx::preset::blend::ALPHA),
+        out: gfx::BlendTarget<gfx_types::RenderFormat> = ("Target0", gfx::state::ColorMask::all(), gfx::preset::blend::ALPHA),
     }
 }
 
@@ -119,7 +119,7 @@ impl TextureAtlasBuilder {
         };
         if total_rgba.len() > 0 {
             let kind = gfx::texture::Kind::D2(max_width as u16, total_height as u16, gfx::texture::AaMode::Single);
-            let (_, resource_view) = factory.create_texture_immutable_u8::<gfx_types::RenderFormat>(kind, &[&total_rgba])?;
+            let (_, resource_view) = factory.create_texture_immutable_u8::<gfx_types::RenderFormat>(kind, gfx::texture::Mipmap::Provided, &[&total_rgba])?;
             Ok(SpriteTextureAtlas::new(sprite_canvases, resource_view))
         }
         else {
@@ -276,7 +276,7 @@ impl SpritesDrawer {
             shape_vertex.push(Vertex { pos: canvas_corners.2, uv: texture_corners.2 }); // bottom right
         }
         self.buffer = {
-            let buffer = factory.create_buffer::<Vertex>(shape_vertex.len(), gfx::buffer::Role::Vertex, gfx_core::memory::Usage::Dynamic, gfx::Bind::empty()).unwrap();
+            let buffer = factory.create_buffer::<Vertex>(shape_vertex.len(), gfx::buffer::Role::Vertex, gfx_core::memory::Usage::Dynamic, gfx::memory::Bind::empty()).unwrap();
             if let Err(e) = encoder.update_buffer(&buffer, &shape_vertex[..], 0) {
                 error!("Error initializing buffer: {}", e);
             }

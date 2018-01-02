@@ -238,7 +238,7 @@ impl Scene for Fight {
 
     fn display(&mut self, window: &mut Window) {
         if let Some(loaded_data) = self.loaded_data.as_mut() {
-            let (mut factory, encoder, render_target_view) = window.gfx_data();
+            let (factory, encoder, render_target_view) = window.gfx_data();
             for i in 0..self.players.len() {
                 let player = &mut self.players[i];
                 if let Some(animator) = player.animator.as_mut() {
