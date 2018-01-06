@@ -90,30 +90,31 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
         // if the image uses PCX run-length encoding
         if using_rle {
             while pixel_index < max_pixel {
-                let (mut run_length, color_index, rle_run) = {
+                let (mut run_length, color_index, rle_run, padding) = {
                     if scanline_position < scanline_length {
                         let first_byte = reader.read_u8()?;
                         // if it's a RLE byte
                         if (first_byte & 0xC0) == 0xC0 {
                             let run_length = first_byte & 0x3F;
                             let second_byte = reader.read_u8()?;
-                            (run_length as usize, second_byte as usize, true)
+                            (run_length as usize, second_byte as usize, true, false)
                         }
                         else {
-                            (1, first_byte as usize, false)
+                            (1, first_byte as usize, false, false)
                         }
                     }
                     else {
-                        (line_padding as usize, 0, false)
+                        scanline_position = 0;
+                        (line_padding as usize, 0, false, true)
                     }
                 };
-                if scanline_position + (run_length as u16) >= scanline_length {
-                    if rle_run {
-                        run_length = (scanline_length - scanline_position - (bytes_per_plane - width)) as usize;
-                    }
-                    else {
-                        run_length = 1;
-                    }
+                if padding || scanline_position + (run_length as u16) >= scanline_length {
+                    run_length = match (padding, rle_run, bytes_per_plane == width) {
+                        (true, _, _) => run_length,
+                        (false, true, _) => (scanline_length - scanline_position - line_padding) as usize,
+                        (false, false, true) => 1,
+                        (false, false, false) => 0,
+                    };
                     // reset scanline
                     scanline_position = 0;
                 }
