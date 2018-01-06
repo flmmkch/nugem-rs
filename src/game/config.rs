@@ -15,7 +15,7 @@ const DEFAULT_TICKS_PER_SECOND : u32 = 60;
 
 impl Config {
     pub fn new() -> Config {
-        let ticks_per_second = DEFAULT_TICKS_PER_SECOND;
+        let mut ticks_per_second = DEFAULT_TICKS_PER_SECOND;
         let mut data_paths = Vec::new();
         data_paths.push(PathBuf::from("./"));
         let mut window_size = (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
@@ -46,12 +46,22 @@ impl Config {
                             }
                             _ => (),
                         }
-                    }
+                    },
                     "--data" => {
                         let next = &args[i+1];
                         data_paths.push(PathBuf::from(next));
                         i += 1;
-                    }
+                    },
+                    "--fps" => {
+                        let next = &args[i+1];
+                        match next.parse::<u32>() {
+                            Ok(v) => {
+                                ticks_per_second = v;
+                                i += 1;
+                            }
+                            _ => (),
+                        }
+                    },
                     _ => (),
                 }
                 i += 1;
