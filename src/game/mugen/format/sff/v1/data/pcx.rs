@@ -70,7 +70,7 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
     // 65: number of color planes
     let bit_planes = (reader.read_u8()?) as u16;
     // 66 - 67: bytes per plane for a line
-    reader.seek(SeekFrom::Current(2))?;
+    let bytes_per_plane = reader.read_u16::<LittleEndian>()?;
     // 68 - 69: palette type
     reader.seek(SeekFrom::Current(2))?;
     // 70 - 71: horizontal scrolling info
@@ -79,7 +79,7 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
     reader.seek(SeekFrom::Current(2))?;
     // skip to byte 128
     reader.seek(SeekFrom::Start(128))?;
-    let scanline_length = bit_planes * width;
+    let scanline_length = bit_planes * bytes_per_plane;
     let line_padding = scanline_length * 8 / bits_per_pixel - width;
     let mut surface = BitmapSurface::new(width as u32, height as u32);
     // finished reading the header, now reading the pixel data
@@ -90,34 +90,38 @@ pub fn read_pcx_surface<T: Read + Seek>(mut reader: T, palette: &Palette) -> Res
         // if the image uses PCX run-length encoding
         if using_rle {
             while pixel_index < max_pixel {
-                let mut reset_scanline = false;
-                let (mut run_length, color_index) = {
+                let (mut run_length, color_index, rle_run) = {
                     if scanline_position < scanline_length {
                         let first_byte = reader.read_u8()?;
                         // if it's a RLE byte
                         if (first_byte & 0xC0) == 0xC0 {
                             let run_length = first_byte & 0x3F;
                             let second_byte = reader.read_u8()?;
-                            (run_length as usize, second_byte as usize)
+                            (run_length as usize, second_byte as usize, true)
                         }
                         else {
-                            (1, first_byte as usize)
+                            (1, first_byte as usize, false)
                         }
                     }
                     else {
-                        (line_padding as usize, 0)
+                        (line_padding as usize, 0, false)
                     }
                 };
                 if scanline_position + (run_length as u16) >= scanline_length {
-                    run_length = (scanline_length - scanline_position) as usize;
-                    reset_scanline = true;
+                    if rle_run {
+                        run_length = (scanline_length - scanline_position - (bytes_per_plane - width)) as usize;
+                    }
+                    else {
+                        run_length = 1;
+                    }
+                    // reset scanline
+                    scanline_position = 0;
+                }
+                else {
+                    scanline_position += run_length as u16;
                 }
                 if pixel_index + (run_length as usize) > max_pixel {
                     run_length = (max_pixel - pixel_index) as usize;
-                }
-                scanline_position += run_length as u16;
-                if reset_scanline {
-                    scanline_position = 0;
                 }
                 let color = {
                     if color_index > 0 {
