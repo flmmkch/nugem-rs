@@ -388,6 +388,7 @@ dependencies = [
 name = "nugem"
 version = "0.1.0"
 dependencies = [
+ "byteorder",
  "env_logger",
  "game_time",
  "gfx",
@@ -397,17 +398,8 @@ dependencies = [
  "lazy_static 0.2.11",
  "log 0.3.9",
  "nom",
- "nugem-sff",
  "regex",
  "sdl2",
-]
-
-[[package]]
-name = "nugem-sff"
-version = "0.1.0"
-dependencies = [
- "byteorder",
- "thiserror",
 ]
 
 [[package]]
@@ -626,26 +618,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bab24d30b911b2376f3a13cc2cd443142f0c81dda04c118693e35b3835757755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "thiserror"
-version = "1.0.37"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10deb33631e3c9018b9baf9dcbbc4f737320d2b576bac10f6aefa048fa407e3e"
-dependencies = [
- "thiserror-impl",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.37"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "982d17546b47146b28f7c22e3d08465f6b8903d0ea13c1660d9d84a6e7adcdbb"
-dependencies = [
- "proc-macro2 1.0.47",
- "quote 1.0.21",
- "syn 1.0.103",
 ]
 
 [[package]]

@@ -1,0 +1,18 @@
+[package]
+name = "nugem"
+version = "0.1.0"
+authors = ["Victor Nivet <victor@saumon.ninja>"]
+
+[dependencies]
+sdl2 = "0.31"
+gfx = "0.17"
+gfx_core = "0.8"
+gfx_window_sdl = "0.8"
+gfx_device_gl = "0.15"
+lazy_static = "0.2"
+regex = "0.2"
+log = "0.3"
+env_logger = "0.4"
+game_time = "0.2"
+nom = "3.2"
+nugem-sff = { path = "../sff" }

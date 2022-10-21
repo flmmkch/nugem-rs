@@ -1,0 +1,9 @@
+[package]
+name = "nugem-sff"
+version = "0.1.0"
+authors = ["Victor Nivet <victor@saumon.ninja>"]
+edition = "2021"
+
+[dependencies]
+byteorder = "1.4"
+thiserror = "1.0"
