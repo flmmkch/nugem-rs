@@ -154,17 +154,13 @@ impl Fight {
         for i in 0..self.players.len() {
             let player = &mut self.players[i];
             if let Some(animator) = player.animator.as_mut() {
-                let sprite_id = {
-                    let (group, image) = animator.current_display_info();
-                    let key = ImageKey {
-                        group,
-                        image,
-                    };
-                    *player.image_keys.get(&key).unwrap()
-                };
-                let (w, h) = texture_atlas.dimensions(sprite_id);
-                sprite_canvas.add_sprite(player.big_face, (50 + i * 300) as u32, 450, 175, 175);
-                player.sprite_id = sprite_canvas.add_sprite(sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                if let Some((group, image)) = animator.current_display_info() {
+                    let key = ImageKey { group, image };
+                    let sprite_id = *player.image_keys.get(&key).unwrap();
+                    let (w, h) = texture_atlas.dimensions(sprite_id);
+                    sprite_canvas.add_sprite(player.big_face, (50 + i * 300) as u32, 450, 175, 175);
+                    player.sprite_id = sprite_canvas.add_sprite(sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                }
             }
         }
         self.loaded_data = Some(FightData {
@@ -261,7 +257,7 @@ impl Scene for Fight {
                 let player = &mut self.players[i];
                 if let Some(animator) = player.animator.as_mut() {
                     if animator.tick() {
-                        let (group, image) = animator.current_display_info();
+                        if let Some((group, image)) = animator.current_display_info() {
                             // change frame
                             let sprite_id = {
                                 let key = ImageKey {
@@ -272,6 +268,7 @@ impl Scene for Fight {
                             };
                             let (w, h) = loaded_data.texture_atlas.dimensions(sprite_id);
                             loaded_data.sprite_canvas.update_canvas(player.sprite_id, sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                        }
                     }
                 }
             }

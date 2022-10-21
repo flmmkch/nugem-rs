@@ -1,4 +1,4 @@
-use super::Animation;
+use super::{Animation, AnimationFrame};
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
 pub struct Animator {
@@ -22,8 +22,12 @@ impl Animator {
         self.current_frame = 0;
         self.tick_timer = 0;
     }
+    fn current_animation(&self) -> Option<&AnimationFrame> {
+        self.animation.steps().get(self.current_step)
+            .and_then(|step| step.frames().get(self.current_frame))
+    }
     pub fn tick(&mut self) -> bool {
-        if let Some(tick_max) = self.animation.steps()[self.current_step].frames()[self.current_frame].ticks {
+        if let Some(tick_max) = self.current_animation().and_then(|f| f.ticks) {
             self.tick_timer += 1;
             if self.tick_timer >= tick_max {
                 self.tick_timer = 0;
@@ -59,8 +63,8 @@ impl Animator {
     pub fn animation(&self) -> &Animation {
         &self.animation
     }
-    pub fn current_display_info(&self) -> (u16, u16) {
-        let current_frame = &self.animation.steps()[self.current_step].frames()[self.current_frame];
-        (current_frame.group, current_frame.image)
+    pub fn current_display_info(&self) -> Option<(u16, u16)> {
+        self.current_animation()
+            .map(|frame| (frame.group, frame.image))
     }
 }
