@@ -36,7 +36,7 @@ impl Device {
     pub fn state(&self) -> &State {
         &self.current_state
     }
-    pub fn process_state(&mut self, partial_state: PartialState) -> Option<PartialState> {
+    pub fn process_state(&mut self, partial_state: PartialState,) -> Option<PartialState> {
         let original_state = self.current_state.clone();
         self.current_state.accept(partial_state.clone());
         if &self.current_state != &original_state {

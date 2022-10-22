@@ -6,7 +6,7 @@ use crate::game::graphics::window::Window;
 use crate::game::graphics::sprite_displayer;
 use crate::game::Config;
 use crate::game::events;
-use crate::game::input;
+use crate::game::input::{self, DirectionState, DirectionalMotion, Directional};
 use std::collections::{BTreeMap, HashMap};
 use log::error;
 
@@ -122,9 +122,8 @@ impl Fight {
             let chara_data = self.characters.get(player.character_id).expect(&format!("Failed to load character {0}", player.character_id));
             let palette_index = 0;
             let render_sff_sprite = |group_index, image_index, palette_index| {
-                let mut renderer = BitmapSurfaceRenderer::default();
-                chara_data.sff_data.render_sprite(&mut renderer, group_index, image_index, palette_index).expect(&format!("Failed to render sprite for group {group_index}, image {image_index}, palette {palette_index}"));
-                renderer.take().expect(&format!("No sprite to render for group {group_index}, image {image_index}, palette {palette_index}"))
+                let renderer: BitmapSurfaceRenderer = chara_data.sff_data.render_sprite((), group_index, image_index, palette_index).expect(&format!("Failed to render sprite for group {group_index}, image {image_index}, palette {palette_index}"));
+                renderer.take()
             };
             player.animator = Some(air::Animator::new(chara_data.animations[player.current_animation].clone()));
             player.small_face = sprite_atlas_builder.add_surface(render_sff_sprite(9000, 0, palette_index));
@@ -139,16 +138,10 @@ impl Fight {
                             image: frame.image,
                         };
                         if player.image_keys.get(&key) == None {
-                            let mut renderer = BitmapSurfaceRenderer::default();
-                            match chara_data.sff_data.render_sprite(&mut renderer, key.group, key.image, palette_index) {
-                                Ok(()) => {
-                                    if let Some(rendered_sprite) = renderer.take() {
-                                        let image_id = sprite_atlas_builder.add_surface(rendered_sprite);
-                                        player.image_keys.insert(key, image_id);
-                                    }
-                                    else {
-                                        error!("No sprite to render from group {0}, image {1}, palette {2}", key.group, key.image, palette_index);
-                                    }
+                            match chara_data.sff_data.render_sprite::<BitmapSurfaceRenderer>((), key.group, key.image, palette_index) {
+                                Ok(renderer) => {
+                                    let image_id = sprite_atlas_builder.add_surface(renderer.take());
+                                    player.image_keys.insert(key, image_id);
                                 },
                                 Err(err) => {
                                     error!("Unable to render sprite from group {0}, image {1}, palette {2}: {err}", key.group, key.image, palette_index);
@@ -180,6 +173,30 @@ impl Fight {
             sprite_canvas,
         });
     }
+    fn wheel_selection(current: usize, max: usize, move_by: isize) -> usize {
+        if move_by > 0 {
+            (current + move_by.abs() as usize) % max
+        }
+        else if move_by < 0 {
+            (current - move_by.abs() as usize) % max
+        }
+        else {
+            current
+        }
+    }
+    fn change_animation(&mut self, by: isize) {
+        let player = &mut self.players[0];
+        let animation_count = self.characters[player.character_id].animations.len();
+        player.current_animation = Self::wheel_selection(player.current_animation, animation_count, by);
+        self.unload();
+    }
+    fn change_character(&mut self, by: isize) {
+        let character_count = self.characters.len();
+        let player = &mut self.players[0];
+        player.current_animation = 0;
+        player.character_id = Self::wheel_selection(player.character_id, character_count, by);
+        self.unload();
+    }
 }
 
 impl Scene for Fight {
@@ -193,62 +210,15 @@ impl Scene for Fight {
                         if input_event.partial_state.back == Some(input::ButtonState::Down) {
                             return false;
                         }
-                        match input_event.partial_state.directional {
-                            Some(input::PartialDirectional::Vertical(input::DirectionState::Minus))
-                            | Some(input::PartialDirectional::FullDirection(input::Directional::Down)) => {
-                                let animation_count = self.characters[self.players[0].character_id].animations.len();
-                                {
-                                    let player = &mut self.players[0];
-                                    if player.current_animation == 0 {
-                                        player.current_animation = animation_count - 1;
-                                    }
-                                    else {
-                                        player.current_animation -= 1;
-                                    }
-                                }
-                                self.unload();
-                            },
-                            Some(input::PartialDirectional::Vertical(input::DirectionState::Plus))
-                            | Some(input::PartialDirectional::FullDirection(input::Directional::Up)) => {
-                                let animation_count = self.characters[self.players[0].character_id].animations.len();
-                                {
-                                    let player = &mut self.players[0];
-                                    player.current_animation += 1;
-                                    if player.current_animation >= animation_count {
-                                        player.current_animation = 0;
-                                    }
-                                }
-                                self.unload();
-                            },
-                            Some(input::PartialDirectional::Horizontal(input::DirectionState::Plus))
-                            | Some(input::PartialDirectional::FullDirection(input::Directional::Forward)) => {
-                                let character_count = self.characters.len();
-                                {
-                                    let player = &mut self.players[0];
-                                    player.current_animation = 0;
-                                    player.character_id += 1;
-                                    if player.character_id >= character_count {
-                                        player.character_id = 0;
-                                    }
-                                }
-                                self.unload();
-                            },
-                            Some(input::PartialDirectional::Horizontal(input::DirectionState::Minus))
-                            | Some(input::PartialDirectional::FullDirection(input::Directional::Backward)) => {
-                                let character_count = self.characters.len();
-                                {
-                                    let player = &mut self.players[0];
-                                    player.current_animation = 0;
-                                    if player.character_id == 0 {
-                                        player.character_id = character_count - 1;
-                                    }
-                                    else {
-                                        player.character_id -= 1;
-                                    }
-                                }
-                                self.unload();
-                            },
-                            _ => (),
+                        log::debug!("Got input event {input_event:?}");
+                        if let Some(motion) = input_event.partial_state.directional {
+                            match motion {
+                                DirectionalMotion::Vertical(DirectionState::Plus) | DirectionalMotion::FullDirection(Directional::Up) => self.change_character(1),
+                                DirectionalMotion::Vertical(DirectionState::Minus) | DirectionalMotion::FullDirection(Directional::Down) => self.change_character(-1),
+                                DirectionalMotion::Horizontal(DirectionState::Plus) | DirectionalMotion::FullDirection(Directional::Forward) => self.change_animation(1),
+                                DirectionalMotion::Horizontal(DirectionState::Minus) | DirectionalMotion::FullDirection(Directional::Backward) => self.change_animation(-1),
+                                _ => (),
+                            }
                         }
                     },
                 }

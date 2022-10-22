@@ -1,4 +1,4 @@
-use super::{AcceptInputDirectional, AcceptInputState, ButtonState, Directional, PartialState};
+use super::{AcceptInputState, ButtonState, Directional, PartialState};
 
 /// Input state.
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -40,8 +40,8 @@ macro_rules! take_input {
 
 impl AcceptInputState for State {
     fn accept(&mut self, partial_state: PartialState) {
-        if let Some(partial_directional) = partial_state.directional {
-            self.directional.accept(partial_directional);
+        if let Some(motion) = partial_state.directional {
+            self.directional = self.directional.motion(motion);
         }
         take_input!(a, self, partial_state);
         take_input!(b, self, partial_state);

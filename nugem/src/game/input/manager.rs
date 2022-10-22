@@ -138,30 +138,32 @@ impl Manager {
                 axis,
                 value,
             } => {
-                let direction_state_option = {
+                let direction_motion_option = {
+                    use DirectionalMotion::*;
+                    use DirectionState::*;
                     let positive = value > SDL_AXIS_THRESHOLD;
                     let negative = value < -SDL_AXIS_THRESHOLD;
                     match axis {
                         sdl2::controller::Axis::LeftX => {
                             match (positive, negative) {
-                                (true, false) => Some(PartialDirectional::Horizontal(DirectionState::Plus)),
-                                (false, true) => Some(PartialDirectional::Horizontal(DirectionState::Minus)),
-                                (false, false) => Some(PartialDirectional::Horizontal(DirectionState::Neutral)),
+                                (true, false) => Some(Horizontal(Plus)),
+                                (false, true) => Some(Horizontal(Minus)),
+                                (false, false) => Some(Horizontal(Neutral)),
                                 _ => None
                             }
                         },
                         sdl2::controller::Axis::LeftY => {
                             match (positive, negative) {
-                                (true, false) => Some(PartialDirectional::Vertical(DirectionState::Minus)),
-                                (false, true) => Some(PartialDirectional::Vertical(DirectionState::Plus)),
-                                (false, false) => Some(PartialDirectional::Vertical(DirectionState::Neutral)),
+                                (true, false) => Some(Vertical(Minus)),
+                                (false, true) => Some(Vertical(Plus)),
+                                (false, false) => Some(Vertical(Neutral)),
                                 _ => None
                             }
                         },
                         _ => None,
                     }
                 };
-                process_input_event!(direction_state_option, directional, which)
+                process_input_event!(direction_motion_option, directional, which)
             },
             sdl2::event::Event::ControllerButtonDown {
                 timestamp: _,

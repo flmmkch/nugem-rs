@@ -1,9 +1,9 @@
-use super::{AcceptInputDirectional, AcceptInputState, ButtonState, PartialDirectional};
+use super::{AcceptInputState, ButtonState, DirectionalMotion};
 
 /// Partial input state.
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub struct PartialState {
-    pub directional: Option<PartialDirectional>,
+    pub directional: Option<DirectionalMotion>,
     pub a: Option<ButtonState>,
     pub b: Option<ButtonState>,
     pub c: Option<ButtonState>,
@@ -40,13 +40,9 @@ macro_rules! take_optional_input {
 
 impl AcceptInputState for PartialState {
     fn accept(&mut self, partial_state: PartialState) {
-        if let Some(partial_directional) = partial_state.directional {
-            if self.directional.is_some() {
-                self.directional.as_mut().unwrap().accept(partial_directional);
-            }
-            else {
-                self.directional = Some(partial_directional);
-            }
+        if let Some(motion) = partial_state.directional {
+            let direction = self.directional.map(|d| d.accept_motion(motion)).unwrap_or(motion);
+            self.directional = Some(direction);
         }
         take_optional_input!(a, self, partial_state);
         take_optional_input!(b, self, partial_state);
