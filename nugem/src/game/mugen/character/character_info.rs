@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io::BufRead;
-use ::game::mugen::format::generic_def::{Categories, DefLine};
+use crate::game::mugen::format::generic_def::{Categories, DefLine};
 
 pub type CharacterInfo = HashMap<String, HashMap<String, String>>;
 

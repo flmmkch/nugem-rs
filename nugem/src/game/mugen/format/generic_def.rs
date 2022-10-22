@@ -1,6 +1,7 @@
 use regex::{Regex, Captures};
-use std::io::{BufRead, BufReader, Lines};
+use std::io::{BufReader, Lines, Read, BufRead};
 use std::vec;
+use lazy_static::lazy_static;
 
 pub struct GenericDef {
 }
@@ -149,7 +150,7 @@ impl Category {
 
 impl GenericDef {
     /// Read a *.def file and get an iterator on the categories
-    pub fn read<T: BufRead>(input: T) -> Categories<BufReader<T>> {
+    pub fn read<T: Read>(input: T) -> Categories<BufReader<T>> {
         let buffer = BufReader::new(input);
         Categories {
             lines: buffer.lines(),

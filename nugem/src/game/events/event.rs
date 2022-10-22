@@ -1,4 +1,4 @@
-use ::game::input;
+use crate::game::input;
 
 #[derive(Debug)]
 pub enum Event {

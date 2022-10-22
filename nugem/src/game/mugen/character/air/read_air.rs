@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use ::game::mugen::format::generic_def::{Categories, DefLine, GenericDef};
+use crate::game::mugen::format::generic_def::{DefLine, GenericDef};
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::BufReader;
 use regex::Regex;
+use lazy_static::lazy_static;
 use super::*;
 
 pub fn read_air_file(cmd_file: File) -> HashMap<u32, Animation>  {

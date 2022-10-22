@@ -2,6 +2,7 @@ use super::*;
 use std::collections::HashMap;
 use sdl2::{self, GameControllerSubsystem, JoystickSubsystem};
 use std::io::{BufRead, BufReader, Cursor};
+use log::{error, info};
 
 #[derive(Debug)]
 pub struct Manager {

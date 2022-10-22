@@ -1,6 +1,6 @@
 use super::*;
 use std::collections::VecDeque;
-use ::game::input;
+use crate::game::input;
 use sdl2;
 
 pub struct EventQueue {

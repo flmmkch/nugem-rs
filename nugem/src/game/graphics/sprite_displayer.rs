@@ -2,8 +2,10 @@ use super::surface::BitmapSurface;
 use super::Error;
 use super::gfx_types;
 use gfx;
+use gfx::*;
 use gfx_core;
 use gfx::traits::{Factory, FactoryExt};
+use log::error;
 
 gfx_defines!{
     vertex Vertex {

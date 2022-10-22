@@ -1,4 +1,4 @@
-use ::game::Config;
+use crate::game::Config;
 use sdl2;
 use gfx_window_sdl;
 use gfx_core::Device;
@@ -21,7 +21,7 @@ const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
 impl Window {
     pub fn new(config: &Config, sdl_video: &sdl2::VideoSubsystem) -> Window {
         let (sdl_window, gl_context, device, mut factory, render_target_view, depth_view) = {
-            let mut window_builder = sdl_video.window("Rugen", config.window_size().0, config.window_size().1);
+            let mut window_builder = sdl_video.window("Nugem", config.window_size().0, config.window_size().1);
             if config.fullscreen() {
                 window_builder.fullscreen();
             }

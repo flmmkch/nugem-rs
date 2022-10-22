@@ -2,17 +2,17 @@
 name = "nugem"
 version = "0.1.0"
 authors = ["Victor Nivet <victor@saumon.ninja>"]
+edition = "2021"
 
 [dependencies]
-sdl2 = "0.31"
-gfx = "0.17"
-gfx_core = "0.8"
-gfx_window_sdl = "0.8"
-gfx_device_gl = "0.15"
-lazy_static = "0.2"
-regex = "0.2"
-log = "0.3"
-env_logger = "0.4"
-game_time = "0.2"
-nom = "3.2"
+sdl2 = "0.32"
+gfx = "0.18"
+gfx_core = "0.9"
+gfx_window_sdl = "0.9"
+gfx_device_gl = "0.16"
+lazy_static = "1.4"
+regex = "1.6"
+log = "0.4"
+env_logger = "0.9"
+nom = "7.1"
 nugem-sff = { path = "../sff" }

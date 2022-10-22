@@ -1,4 +1,4 @@
-use ::game::input;
+use crate::game::input;
 
 /// Input entry with a potential modified, such as held down or released
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -20,8 +20,8 @@ pub struct CommandInput {
     successive_inputs: Vec<CommandInputState>,
 }
 
-impl CommandInputState {
-    pub fn new() -> CommandInputState {
+impl Default for CommandInputState {
+    fn default() -> Self {
         CommandInputState {
             directional: None,
             button_presses: Vec::new(),

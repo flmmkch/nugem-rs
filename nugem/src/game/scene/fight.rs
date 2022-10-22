@@ -1,14 +1,14 @@
-use crate::game::graphics::surface::BitmapSurfaceRenderer;
-
 use super::Scene;
-use ::game::mugen::character::{Character, find_characters};
-use ::game::mugen::character::air;
-use ::game::graphics::window::Window;
-use ::game::graphics::sprite_displayer;
-use ::game::Config;
-use ::game::events;
-use ::game::input;
+use crate::game::graphics::surface::BitmapSurfaceRenderer;
+use crate::game::mugen::character::{Character, find_characters, command};
+use crate::game::mugen::character::air;
+use crate::game::graphics::window::Window;
+use crate::game::graphics::sprite_displayer;
+use crate::game::Config;
+use crate::game::events;
+use crate::game::input;
 use std::collections::{BTreeMap, HashMap};
+use log::error;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 struct ImageKey {
@@ -36,6 +36,7 @@ struct CharaData {
     pub character: Character,
     pub sff_data: nugem_sff::SpriteFile,
     pub animations: Vec<air::Animation>,
+    pub commands: Vec<command::Command>,
 }
 
 pub struct Fight {
@@ -69,27 +70,37 @@ impl Fight {
                 v
             })
             .into_iter()
-            .filter_map(|character: Character| {
-                if let Ok(sff_data) = character.read_data() {
-                    let animations : Vec<_> = {
-                        // first use a btreemap for the animations to be in order
-                        character
-                            .read_animations()
-                            .into_iter()
-                            .collect::<BTreeMap<u32, air::Animation>>()
-                            .into_iter()
-                            .map(|(_, animation)| { animation })
-                            .collect()
-                    }; 
-                    Some(CharaData {
-                        character,
-                        sff_data,
-                        animations,
-                    })
-                }
-                else {
-                    None
-                }
+            .filter_map(|character: Character| -> Option<CharaData> {
+                let sff_data = match character.read_data() {
+                    Ok(sff_data) => sff_data,
+                    Err(err) => {
+                        log::error!("Error loading sprite data for {0}: {1}", character.name(), err);
+                        None?
+                    }
+                };
+                let commands = match character.read_commands() {
+                    Ok(commands) => commands,
+                    Err(err) => {
+                        log::error!("Error loading command data for {0}: {1}", character.name(), err);
+                        None?
+                    }
+                };
+                let animations : Vec<_> = {
+                    // first use a btreemap for the animations to be in order
+                    character
+                        .read_animations()
+                        .into_iter()
+                        .collect::<BTreeMap<u32, air::Animation>>()
+                        .into_iter()
+                        .map(|(_, animation)| { animation })
+                        .collect()
+                }; 
+                Some(CharaData {
+                    character,
+                    sff_data,
+                    animations,
+                    commands,
+                })
             })
             .collect();
         let players = [Player::new(0), Player::new(1)];
@@ -121,8 +132,8 @@ impl Fight {
             {
                 player.image_keys.clear();
                 let animator = player.animator.as_ref().unwrap();
-                for ref step in animator.animation().steps() {
-                    for ref frame in step.frames() {
+                for step in animator.animation().steps() {
+                    for frame in step.frames() {
                         let key = ImageKey {
                             group: frame.group,
                             image: frame.image,
