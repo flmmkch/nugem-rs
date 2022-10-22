@@ -4,20 +4,21 @@ use std::num::IntErrorKind;
 
 use super::BitmapPixel;
 
-pub trait BitmapRenderer: Seek {
+pub trait BitmapRenderer: Seek + Sized {
     type Error: From<io::Error> + From<IntErrorKind>;
+    type Initializer;
     /// Initializes a drawing surface with a given `width` and `height`
-    fn initialize_surface(&mut self, width: u64, height: u64) -> Result<(), Self::Error>;
+    fn initialize_surface(initializer: Self::Initializer, width: u64, height: u64) -> Result<Self, Self::Error>;
     /// Renders pixels
     fn render_pixels(&mut self, pixel: BitmapPixel, count: u64) -> Result<(), Self::Error>;
     /// Gets the total number of pixels in the surface
-    fn surface_pixel_count(&self) -> Result<u64, Self::Error>;
+    fn surface_pixel_count(&mut self) -> Result<u64, Self::Error>;
     /// Renders one pixel
     fn render_single_pixel(&mut self, pixel: BitmapPixel) -> Result<(), Self::Error> {
-        self.render_pixels(pixel, 1)
+        Self::render_pixels(self, pixel, 1)
     }
     /// Get the given pixel for an index
-    fn get_pixel(&self, pixel_index: u64) -> Result<Option<BitmapPixel>, Self::Error>;
+    fn get_pixel(&mut self, pixel_index: u64) -> Result<Option<BitmapPixel>, Self::Error>;
     /// Copy already rendered pixels with a negative offset
     fn copy_pixels_offset(&mut self, count: u64, offset: u64) -> Result<(), Self::Error> {
         let start_pixel_index = self.stream_position()?;

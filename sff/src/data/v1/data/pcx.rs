@@ -4,7 +4,7 @@ use super::{Palette, Color};
 use std::io::{Read, Seek, SeekFrom};
 use byteorder::{LittleEndian, ReadBytesExt};
 
-pub fn read_pcx_surface<T: Read + Seek, R: BitmapRenderer>(mut reader: T, renderer: &mut R, palette: &Palette) -> Result<(), RenderingError<R::Error>> {
+pub fn read_pcx_surface<T: Read + Seek, R: BitmapRenderer>(mut reader: T, renderer_params: R::Initializer, palette: &Palette) -> Result<R, RenderingError<R::Error>> {
     // PCX file format:
     // reading the PCX header
     // byte 0: manufacturer, must be 0x0A
@@ -81,7 +81,7 @@ pub fn read_pcx_surface<T: Read + Seek, R: BitmapRenderer>(mut reader: T, render
     reader.seek(SeekFrom::Start(128))?;
     let scanline_length = bit_planes * bytes_per_plane;
     let line_padding = scanline_length * 8 / bits_per_pixel - width;
-    renderer.initialize_surface(width as u64, height as u64).map_err(RenderingError::renderer_error)?;
+    let mut surface_renderer = R::initialize_surface(renderer_params, width as u64, height as u64).map_err(RenderingError::renderer_error)?;
     // finished reading the header, now reading the pixel data
     {
         let max_pixel = (width as u64) * (height as u64);
@@ -132,7 +132,7 @@ pub fn read_pcx_surface<T: Read + Seek, R: BitmapRenderer>(mut reader: T, render
                         Color::Transparent
                     }
                 };
-                renderer.render_pixels(color.into(), run_length).map_err(RenderingError::renderer_error)?;
+                R::render_pixels(&mut surface_renderer, color.into(), run_length).map_err(RenderingError::renderer_error)?;
                 pixel_index += run_length;
             }
         }
@@ -141,9 +141,9 @@ pub fn read_pcx_surface<T: Read + Seek, R: BitmapRenderer>(mut reader: T, render
             for _ in 0..max_pixel {
                 let color_byte = reader.read_u8()?;
                 let pixel = palette.colors[color_byte as usize].into();
-                renderer.render_single_pixel(pixel).map_err(RenderingError::renderer_error)?;
+                R::render_single_pixel(&mut surface_renderer, pixel).map_err(RenderingError::renderer_error)?;
             }
         }
     }
-    Ok(())
+    Ok(surface_renderer)
 }

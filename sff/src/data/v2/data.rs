@@ -83,7 +83,7 @@ impl Data {
             &palette
         }
     }
-    pub fn sprite_index_surface<R: BitmapRenderer>(&self, renderer: &mut R, sprite_number: usize, palette_number: usize) -> Result<(), RenderingError<R::Error>> {
+    pub fn sprite_index_surface<R: BitmapRenderer>(&self, renderer_params: R::Initializer, sprite_number: usize, palette_number: usize) -> Result<R, RenderingError<R::Error>> {
         let displayed_sprite = self.linked_sprite(sprite_number);
         let palette_used = {
             // if the sprite indicates a palette number other than 0, it's trying to force that one
@@ -94,12 +94,12 @@ impl Data {
                 self.linked_palette(palette_number)
             }
         };
-        self.sprite_surface(renderer, displayed_sprite, palette_used)
+        self.sprite_surface(renderer_params, displayed_sprite, palette_used)
     }
-    pub fn sprite_surface<R: BitmapRenderer>(&self, renderer: &mut R, sprite_info: &SpriteInfo, palette_info: &PaletteInfo) -> Result<(), RenderingError<R::Error>> {
+    pub fn sprite_surface<R: BitmapRenderer>(&self, renderer_params: R::Initializer, sprite_info: &SpriteInfo, palette_info: &PaletteInfo) -> Result<R, RenderingError<R::Error>> {
         let width = sprite_info.size.0 as u64;
         let height = sprite_info.size.1 as u64;
-        renderer.initialize_surface(width, height).map_err(RenderingError::renderer_error)?;
+        let mut surface_renderer = R::initialize_surface(renderer_params, width, height).map_err(RenderingError::renderer_error)?;
         let colored_pixel = |color: u8| {
             if color > 0 {
                 // 4 bytes per color: 3 bytes for the 8-bit RGB values and an unused one last
@@ -128,7 +128,7 @@ impl Data {
             ImageFormat::Raw => {
                 // raw, uncompressed image
                 for color in sprite_data.iter() {
-                    renderer.render_single_pixel(colored_pixel(*color)).map_err(RenderingError::renderer_error)?;
+                    R::render_single_pixel(&mut surface_renderer, colored_pixel(*color)).map_err(RenderingError::renderer_error)?;
                 }
             },
             ImageFormat::RLE8 => {
@@ -142,11 +142,11 @@ impl Data {
                         data_index += 1;
                         let color_byte = sprite_data[data_index];
                         // output the color for the run length
-                        renderer.render_pixels(colored_pixel(color_byte), run_length as u64).map_err(RenderingError::renderer_error)?;
+                        R::render_pixels(&mut surface_renderer, colored_pixel(color_byte), run_length as u64).map_err(RenderingError::renderer_error)?;
                     }
                     else {
                         // output the raw pixel
-                        renderer.render_single_pixel(colored_pixel(first_byte)).map_err(RenderingError::renderer_error)?;
+                        R::render_single_pixel(&mut surface_renderer, colored_pixel(first_byte)).map_err(RenderingError::renderer_error)?;
                     }
                     data_index += 1;
                 }
@@ -175,7 +175,7 @@ impl Data {
                             (color, data_length_byte & 0x7F)
                         };
                         // output the bytes
-                        renderer.render_pixels(colored_pixel(color), run_length as u64).map_err(RenderingError::renderer_error)?;
+                        R::render_pixels(&mut surface_renderer, colored_pixel(color), run_length as u64).map_err(RenderingError::renderer_error)?;
                         data_length
                     };
                     // reprocess the output according to the data length
@@ -185,7 +185,7 @@ impl Data {
                             let data_byte = sprite_data[data_index];
                             (data_byte & 0x1F, data_byte >> 5)
                         };
-                        renderer.render_pixels(colored_pixel(color), run_length as u64).map_err(RenderingError::renderer_error)?;
+                        R::render_pixels(&mut surface_renderer, colored_pixel(color), run_length as u64).map_err(RenderingError::renderer_error)?;
                     }
                     data_index += 1;
                 }
@@ -196,7 +196,7 @@ impl Data {
                 let mut short_lz_packets : u32 = 1;
                 let mut recycled_bits : u8 = 0;
                 let mut data_index = 0;
-                let max_pixels = renderer.surface_pixel_count().map_err(RenderingError::renderer_error)?;
+                let max_pixels = R::surface_pixel_count(&mut surface_renderer).map_err(RenderingError::renderer_error)?;
                 'data_loop: while data_index < sprite_data.len() {
                     let control_packet = sprite_data[data_index];
                     for packet_index in 0..8 {
@@ -251,7 +251,7 @@ impl Data {
                                 copy_length = (sprite_data[data_index] as u64) + 3;
                             }
                             // to be safer: check if the pixel index is over the surface limit
-                            let start_pixel_index = renderer.stream_position()?;
+                            let start_pixel_index = surface_renderer.stream_position()?;
                             if start_pixel_index + copy_length > max_pixels {
                                 copy_length = max_pixels.saturating_sub(start_pixel_index);
                             }
@@ -262,7 +262,7 @@ impl Data {
                             if offset > 0 {
                                 while copy_length > 0 {
                                     let current_copy_length = copy_length.min(offset);
-                                    renderer.copy_pixels_offset(current_copy_length, offset).map_err(RenderingError::renderer_error)?;
+                                    R::copy_pixels_offset(&mut surface_renderer, current_copy_length, offset).map_err(RenderingError::renderer_error)?;
                                     copy_length = copy_length.saturating_sub(current_copy_length);
                                 }
                             }
@@ -288,7 +288,7 @@ impl Data {
                                 }
                                 (color, run_length)
                             };
-                            renderer.render_pixels(colored_pixel(color), run_length).map_err(RenderingError::renderer_error)?;
+                            R::render_pixels(&mut surface_renderer, colored_pixel(color), run_length).map_err(RenderingError::renderer_error)?;
                         }
                     }
                     data_index += 1;
@@ -296,7 +296,7 @@ impl Data {
             },
             ImageFormat::Invalid(n) => Err(RenderingError::InvalidImageFormat(n))?,
         }
-        Ok(())
+        Ok(surface_renderer)
     }
 }
 
@@ -307,10 +307,9 @@ impl SffData for Data {
     fn palette_count(&self) -> usize {
         self.palettes.len()
     }
-    fn render_sprite<R: BitmapRenderer>(&self, renderer: &mut R, group_index: u16, image_index: u16, palette_index: usize) -> Result<(), crate::RenderingError<R::Error>> {
+    fn render_sprite<R: BitmapRenderer>(&self, renderer_params: R::Initializer, group_index: u16, image_index: u16, palette_index: usize) -> Result<R, crate::RenderingError<R::Error>> {
         let group = self.groups.get(&group_index).ok_or_else(|| RenderingError::InvalidSpriteGroupNumber { invalid_index: group_index, sprite_group_count: self.groups.len() })?;
         let sprite_index = *group.0.get(&image_index).ok_or_else(|| RenderingError::InvalidSpriteNumber { invalid_index: group_index, sprite_count: self.groups.len() })?;
-        self.sprite_index_surface(renderer, sprite_index, palette_index)?;
-        Ok(())
+        self.sprite_index_surface(renderer_params, sprite_index, palette_index).map_err(Into::into)
     }
 }

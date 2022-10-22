@@ -2,7 +2,6 @@ use super::*;
 use std::collections::HashMap;
 use sdl2::{self, GameControllerSubsystem, JoystickSubsystem};
 use std::io::{BufRead, BufReader, Cursor};
-use log::{error, info};
 
 #[derive(Debug)]
 pub struct Manager {
@@ -63,9 +62,9 @@ impl Manager {
         let num_joysticks = self.sdl_gc.num_joysticks().unwrap_or(0);
         for i in 0..num_joysticks {
             if self.sdl_gc.is_game_controller(i) {
-                match self.sdl_gc.open(i) {
+                    match self.sdl_gc.open(i) {
                     Ok(game_controller) => self.add_game_controller(game_controller, i as usize),
-                    Err(e) => error!("Unable to load game controller {}: {}", i, e),
+                    Err(e) => log::error!("Unable to load game controller {}: {}", i, e),
                 }
             }
         }
@@ -74,7 +73,7 @@ impl Manager {
         let name = sdl_game_controller.name();
         // TODO: read initial state better
         let initial_state = State::new();
-        info!("Adding controller {name}");
+        log::info!("Adding controller {name}");
         let device = Device::new(DeviceType::GameController, name, initial_state, DeviceInternal::GameController(sdl_game_controller));
         self.add_device(device, sdl_id);
     }

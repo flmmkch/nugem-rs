@@ -26,18 +26,18 @@ impl SpriteFile {
 
     pub fn render_sprite<R: BitmapRenderer>(
         &self,
-        bitmap_renderer: &mut R,
+        renderer_params: R::Initializer,
         group_index: u16,
         image_index: u16,
         palette_index: usize,
-    ) -> Result<(), RenderingError<<R as BitmapRenderer>::Error>> {
+    ) -> Result<R, RenderingError<<R as BitmapRenderer>::Error>> {
         use SpriteFile::*;
         match self {
             V1(data) => {
-                data.render_sprite(bitmap_renderer, group_index, image_index, palette_index)
+                data.render_sprite(renderer_params, group_index, image_index, palette_index)
             }
             V2(data) => {
-                data.render_sprite(bitmap_renderer, group_index, image_index, palette_index)
+                data.render_sprite(renderer_params, group_index, image_index, palette_index)
             }
         }
     }
@@ -68,11 +68,11 @@ impl SpriteFile {
 pub(crate) trait SffData {
     fn version_bytes() -> &'static VersionBytes;
     fn palette_count(&self) -> usize;
-    fn render_sprite<T: BitmapRenderer>(
+    fn render_sprite<R: BitmapRenderer>(
         &self,
-        bitmap_renderer: &mut T,
+        renderer_params: R::Initializer,
         group_index: u16,
         image_index: u16,
         palette_index: usize,
-    ) -> Result<(), RenderingError<T::Error>>;
+    ) -> Result<R, RenderingError<R::Error>>;
 }

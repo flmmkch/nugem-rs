@@ -44,59 +44,68 @@ impl BitmapSurface {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct BitmapSurfaceRenderer {
-    position: usize,
-    surface: Option<BitmapSurface>,
+    cursor: usize,
+    surface: BitmapSurface,
 }
 
 impl BitmapSurfaceRenderer {
-    pub fn take(&mut self) -> Option<BitmapSurface> {
-        self.position = 0;
-        self.surface.take()
-    }
-}
-
-impl io::Seek for BitmapSurfaceRenderer {
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-        use std::io::SeekFrom;
-        self.position = match pos {
-            SeekFrom::Start(offset) => offset as usize,
-            SeekFrom::End(offset) => self.surface.as_ref().unwrap().pixels().len() + offset as usize,
-            SeekFrom::Current(offset) => self.position + offset as usize,
-        };
-        Ok(self.position as u64)
+    pub fn take(self) -> BitmapSurface {
+        self.surface
     }
 }
 
 impl BitmapRenderer for BitmapSurfaceRenderer {
     type Error = RendererError;
-    fn initialize_surface(&mut self, width: u64, height: u64) -> Result<(), Self::Error> {
-        self.surface.replace(BitmapSurface::new(width as u32, height as u32));
-        self.position = 0;
-        Ok(())
+    type Initializer = ();
+    fn initialize_surface(_initializer: Self::Initializer, width: u64, height: u64) -> Result<Self, Self::Error> {
+        let surface = BitmapSurface::new(width as u32, height as u32);
+        Ok(BitmapSurfaceRenderer { cursor: 0, surface })
     }
     fn render_pixels(&mut self, pixel: BitmapPixel, count: u64) -> Result<(), Self::Error> {
-        let pixels_mut = self.surface.as_mut().unwrap().pixels_mut();
-        pixels_mut[self.position..(self.position + count as usize)].fill(pixel);
-        self.position += count as usize;
+        let pixels_mut = self.surface.pixels_mut();
+        pixels_mut[self.cursor..(self.cursor + count as usize)].fill(pixel);
+        self.cursor += count as usize;
         Ok(())
     }
-    fn surface_pixel_count(&self) -> Result<u64, Self::Error> {
-        let pixel_count = self.surface.as_ref().unwrap().pixels().len();
+    fn surface_pixel_count(&mut self) -> Result<u64, Self::Error> {
+        let pixel_count = self.surface.pixels().len();
         Ok(pixel_count as u64)
     }
     fn render_single_pixel(&mut self, pixel: BitmapPixel) -> Result<(), Self::Error> {
-        let pixels_mut = self.surface.as_mut().unwrap().pixels_mut();
-        pixels_mut[self.position] = pixel;
-        self.position += 1;
+        let pixels_mut = self.surface.pixels_mut();
+        pixels_mut[self.cursor] = pixel;
+        self.cursor += 1;
         Ok(())
     }
-    fn get_pixel(&self, pixel_index: u64) -> Result<Option<BitmapPixel>, Self::Error> {
-        let pixel_opt = self.surface.as_ref().and_then(|s| s.pixels().get(pixel_index as usize)).cloned();
+    fn get_pixel(&mut self, pixel_index: u64) -> Result<Option<BitmapPixel>, Self::Error> {
+        let pixel_opt = self.surface.pixels().get(pixel_index as usize).cloned();
         Ok(pixel_opt)
     }
+    fn copy_pixels_offset(&mut self, count: u64, offset: u64) -> Result<(), Self::Error> {
+        let copy_start_index = self.cursor.saturating_sub(offset as usize);
+        self.surface.pixels_mut().copy_within(copy_start_index..(copy_start_index + count as usize), self.cursor);
+        self.cursor += count as usize;
+        Ok(())
+    }
 }
+
+impl io::Seek for BitmapSurfaceRenderer {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        let new_cursor = match pos {
+            io::SeekFrom::Start(i) => i as usize,
+            io::SeekFrom::End(i) => (self.surface.pixels.len() as i64 + i) as usize,
+            io::SeekFrom::Current(i) => (self.cursor as i64 + i) as usize,
+        };
+        self.cursor = new_cursor;
+        Ok(new_cursor as u64)
+    }
+    fn stream_position(&mut self) -> io::Result<u64> {
+        Ok(self.cursor as u64)
+    }
+}
+
 
 #[derive(Debug)]
 pub enum RendererError {

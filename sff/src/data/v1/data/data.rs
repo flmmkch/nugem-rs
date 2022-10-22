@@ -64,38 +64,37 @@ impl Data {
         }
         result
     }
-    fn render_sprite_linked_index_surface<R: BitmapRenderer>(&self, renderer: &mut R, linked_index: u16, palette: &Palette) -> Result<(), RenderingError<R::Error>> {
+    fn render_sprite_linked_index_surface<R: BitmapRenderer>(&self, renderer_params: R::Initializer, linked_index: u16, palette: &Palette) -> Result<R, RenderingError<R::Error>> {
         // if the specified sprite uses a linked index
         let actual_index = linked_index as usize;
         if actual_index < self.sprites.len() {
-            self.render_sprite_real_index_surface(renderer, actual_index, palette)
+            self.render_sprite_real_index_surface(renderer_params, actual_index, palette)
         }
         else {
             Err(RenderingError::InvalidLinkedSpriteNumber { invalid_index: linked_index, sprite_count: self.sprites.len() })
         }
     }
-    fn render_sprite_real_index_surface<R: BitmapRenderer>(&self, renderer: &mut R, real_index: usize, palette: &Palette) -> Result<(), RenderingError<R::Error>> {
+    fn render_sprite_real_index_surface<R: BitmapRenderer>(&self, renderer_params: R::Initializer, real_index: usize, palette: &Palette) -> Result<R, RenderingError<R::Error>> {
         let specified_sprite = &self.sprites[real_index];
         if specified_sprite.data.len() > 0 {
             let palette = self.sprite_palette(real_index, palette);
             let cursor = Cursor::new(&specified_sprite.data[..]);
-            pcx::read_pcx_surface(cursor, renderer, &palette)?;
-            Ok(())
+            pcx::read_pcx_surface(cursor, renderer_params, &palette)
         }
         else {
-            self.render_sprite_linked_index_surface(renderer, specified_sprite.linked_index, palette)
+            self.render_sprite_linked_index_surface(renderer_params, specified_sprite.linked_index, palette)
         }
     }
-    pub fn render_sprite_surface<R: BitmapRenderer>(&self, renderer: &mut R, group_index: u16, image_index: u16, palette: &Palette) -> Result<(), RenderingError<R::Error>> {
+    pub fn render_sprite_surface<R: BitmapRenderer>(&self, renderer_params: R::Initializer, group_index: u16, image_index: u16, palette: &Palette) -> Result<R, RenderingError<R::Error>> {
         // first get the specified sprite
         let sprite_group = self.groups.get(&group_index).ok_or_else(|| RenderingError::InvalidSpriteGroupNumber { invalid_index: group_index, sprite_group_count: self.groups.len() })?;
         let specified_real_index = *sprite_group.0.get(&image_index).ok_or_else(|| RenderingError::InvalidImageNumber { invalid_index: group_index, image_count: sprite_group.0.len() })?;
         let specified_sprite = &self.sprites[specified_real_index];
         if specified_sprite.data.len() > 0  {
-            self.render_sprite_real_index_surface(renderer, specified_real_index, palette)
+            self.render_sprite_real_index_surface(renderer_params, specified_real_index, palette)
         }
         else {
-            self.render_sprite_linked_index_surface(renderer, specified_sprite.linked_index, palette)
+            self.render_sprite_linked_index_surface(renderer_params, specified_sprite.linked_index, palette)
         }
     }
 }
@@ -107,9 +106,8 @@ impl SffData for Data {
     fn palette_count(&self) -> usize {
         self.palettes.len()
     }
-    fn render_sprite<R: BitmapRenderer>(&self, renderer: &mut R, group_index: u16, image_index: u16, palette_index: usize) -> Result<(), crate::RenderingError<R::Error>> {
+    fn render_sprite<R: BitmapRenderer>(&self, renderer_params: R::Initializer, group_index: u16, image_index: u16, palette_index: usize) -> Result<R, crate::RenderingError<R::Error>> {
         let palette = &self.palettes.get(palette_index).ok_or(RenderingError::PaletteNotFound(palette_index))?;
-        self.render_sprite_surface(renderer, group_index, image_index, palette)?;
-        Ok(())
+        self.render_sprite_surface(renderer_params, group_index, image_index, palette).map_err(Into::into)
     }
 }
