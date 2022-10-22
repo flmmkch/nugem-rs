@@ -1,21 +1,20 @@
 use log::error;
 
 use crate::game::mugen::format::generic_def::{DefLine, GenericDef};
-use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use super::{Command, CommandInput};
 use super::command_input_parser::parse_command_input;
 
-pub fn read_cmd_file(cmd_file: File) -> Vec<Command> {
+pub fn read_cmd_file<R: Read>(read: R, character_name: &str) -> Vec<Command> {
     let mut default_time = 15;
     let mut default_buffer_time = 1;
     let mut commands = Vec::new();
     let mut reading_statedef = false;
-    for category in GenericDef::read(BufReader::new(cmd_file)) {
+    for category in GenericDef::read(BufReader::new(read)) {
         let cat_name = category.name().to_lowercase();
         match cat_name.as_str() {
             "remap" => {
-                log::info!("cmd section not handled: {cat_name}");
+                log::info!("cmd section {cat_name} not handled for character {character_name}");
                 // TODO
             },
             "defaults" => {
@@ -62,7 +61,7 @@ pub fn read_cmd_file(cmd_file: File) -> Vec<Command> {
                                 "command" => command_string = Some(value),
                                 "time" => time = value.parse().ok(),
                                 "buffer.time" => buffer_time = value.parse().ok(),
-                                other => log::debug!("Unknown command key {other}"),
+                                other => log::debug!("Unknown command key {other} for character {character_name}"),
                             }
                         },
                         _ => (),
@@ -74,7 +73,7 @@ pub fn read_cmd_file(cmd_file: File) -> Vec<Command> {
                             CommandInput::new(input_states)
                         }
                         Err(e) => {
-                            error!("Error reading command \"{1}\": {0}", e, name);
+                            error!("Error reading command \"{name}\" for character {character_name}: {e}");
                             CommandInput::new(Default::default())
                         }
                     };
@@ -87,7 +86,7 @@ pub fn read_cmd_file(cmd_file: File) -> Vec<Command> {
             "statedef -1" => reading_statedef = true,
             state_trigger => {
                 // State triggers
-                log::info!("state trigger not handled: {state_trigger}");
+                log::info!("state trigger not handled for character {character_name}: {state_trigger}");
             },
         }
     }

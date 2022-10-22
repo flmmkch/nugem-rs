@@ -106,7 +106,7 @@ impl Character {
         if let Some(cmd_file_name) = self.info.get("files").and_then(|f| f.get("cmd")) {
             let cmd_file_path = self.path.join(&cmd_file_name);
             let cmd_file = fs::File::open(&cmd_file_path)?;
-            Ok(command::read_cmd_file(cmd_file))
+            Ok(command::read_cmd_file(cmd_file, self.name()))
         } else {
             log::error!("Missing command file for character {0}", self.name());
             Ok(Default::default())

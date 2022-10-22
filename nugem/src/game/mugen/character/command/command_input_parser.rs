@@ -117,9 +117,9 @@ fn parse_normal_button(input: &str) -> IResult<&str, CommandInputState>
 fn parse_held_down_button(input: &str) -> IResult<&str, CommandInputState>
 {
     command_input_state_parser(
-        preceded(tag("/"), tuple((map(opt(tag("$")), |o| o.is_some()), parse_button_symbol))),
+        preceded(tag("/"), parse_button_symbol),
         // TODO account for partial push
-        |input_state, (partial_state, button_symbol)| input_state.button_presses.push(ModifiedInput::HoldDown(button_symbol))
+        |input_state, button_symbol| input_state.button_presses.push(ModifiedInput::HoldDown(button_symbol))
     )
     (input)
 }
