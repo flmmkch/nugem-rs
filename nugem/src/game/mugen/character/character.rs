@@ -3,8 +3,8 @@ use std::fs;
 use std::io::BufReader;
 use super::character_info::{self, CharacterInfo};
 use super::command;
-use crate::game::mugen::format::generic_def::GenericDef;
 use crate::game::mugen::character::air::{read_air_file, Animation};
+use crate::game::mugen::format::generic_def::Categories;
 use std::collections::HashMap;
 use nugem_sff::v1::Palette;
 use log::error;
@@ -37,7 +37,7 @@ impl Character {
             if def_path.is_file() {
                 // read the def file
                 let file = fs::File::open(def_path).ok()?;
-                let def_info = GenericDef::read(file);
+                let def_info = Categories::read_def(file);
                 let character_info = character_info::read_def::<BufReader<fs::File>>(def_info)?;
                 let character = Character {
                     info: character_info,

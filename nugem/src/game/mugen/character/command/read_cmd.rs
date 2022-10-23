@@ -1,7 +1,7 @@
 use log::error;
 
-use crate::game::mugen::format::generic_def::{DefLine, GenericDef};
-use std::io::{BufReader, Read};
+use crate::game::mugen::format::generic_def::{DefLine, Categories};
+use std::io::Read;
 use super::{Command, CommandInput};
 use super::command_input_parser::parse_command_input;
 
@@ -10,7 +10,7 @@ pub fn read_cmd_file<R: Read>(read: R, character_name: &str) -> Vec<Command> {
     let mut default_buffer_time = 1;
     let mut commands = Vec::new();
     let mut reading_statedef = false;
-    for category in GenericDef::read(BufReader::new(read)) {
+    for (_, category) in Categories::read_def(read) {
         let cat_name = category.name().to_lowercase();
         match cat_name.as_str() {
             "remap" => {
@@ -18,7 +18,7 @@ pub fn read_cmd_file<R: Read>(read: R, character_name: &str) -> Vec<Command> {
                 // TODO
             },
             "defaults" => {
-                for line in category.lines() {
+                for (_line_number, line) in category.lines() {
                     match line {
                         DefLine::KeyValue(key, value) => {
                             let key_name = key.to_lowercase();
@@ -52,7 +52,7 @@ pub fn read_cmd_file<R: Read>(read: R, character_name: &str) -> Vec<Command> {
                 let mut command_string : Option<String> = None;
                 let mut time : Option<u16> = None;
                 let mut buffer_time : Option<u16> = None;
-                for line in category.lines() {
+                for (_line_number, line) in category.into_lines() {
                     match line {
                         DefLine::KeyValue(key, value) => {
                             let key_name = key.to_lowercase();

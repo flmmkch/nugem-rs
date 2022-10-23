@@ -21,10 +21,10 @@ impl ValidInfo for CharacterInfo {
 
 pub fn read_def<T: BufRead>(def_categories: Categories<T>) -> Option<CharacterInfo> {
     let mut character_info = CharacterInfo::new();
-    for category in def_categories {
+    for (_, category) in def_categories {
         let cat_name = category.name().to_lowercase();
         let cat_map = character_info.entry(cat_name).or_insert(HashMap::new());
-        for line in category.lines() {
+        for (_, line) in category.into_lines() {
             match line {
                 DefLine::KeyValue(key, value) => {
                     let key_name = key.to_lowercase();
@@ -38,6 +38,7 @@ pub fn read_def<T: BufRead>(def_categories: Categories<T>) -> Option<CharacterIn
         Some(character_info)
     }
     else {
+        log::error!("Invalid character info");
         None
     }
 }
