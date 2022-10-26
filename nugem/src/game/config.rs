@@ -17,7 +17,6 @@ impl Config {
     pub fn new() -> Config {
         let mut ticks_per_second = DEFAULT_TICKS_PER_SECOND;
         let mut data_paths = Vec::new();
-        data_paths.push(PathBuf::from("./"));
         let mut window_size = (DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
         let mut fullscreen = DEFAULT_FULLSCREEN;
         // taking arguments into account
