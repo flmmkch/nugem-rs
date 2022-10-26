@@ -178,7 +178,7 @@ impl Fight {
             (current + move_by.abs() as usize) % max
         }
         else if move_by < 0 {
-            (current - move_by.abs() as usize) % max
+            (current as isize - move_by.abs() + max as isize) as usize % max
         }
         else {
             current
