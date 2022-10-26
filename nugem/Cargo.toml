@@ -15,4 +15,7 @@ regex = "1.6"
 log = "0.4"
 env_logger = "0.9"
 nom = "7.1"
+zip = "0.6"
+unrar_sys = "0.2"
+walkdir = "2"
 nugem-sff = { path = "../sff" }

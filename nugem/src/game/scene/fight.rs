@@ -1,6 +1,6 @@
 use super::Scene;
 use crate::game::graphics::surface::BitmapSurfaceRenderer;
-use crate::game::mugen::character::{Character, find_characters, command};
+use crate::game::mugen::character::{Character, command};
 use crate::game::mugen::character::air;
 use crate::game::graphics::window::Window;
 use crate::game::graphics::sprite_displayer;
@@ -21,8 +21,8 @@ struct Player {
     pub image_keys: HashMap<ImageKey, usize>,
     pub current_animation: usize,
     pub animator: Option<air::Animator>,
-    pub big_face: usize,
-    pub small_face: usize,
+    pub big_face: Option<usize>,
+    pub small_face: Option<usize>,
     pub sprite_id: usize,
 }
 
@@ -52,8 +52,8 @@ impl Player {
             image_keys: HashMap::new(),
             current_animation: 0,
             animator: None,
-            big_face: 0,
-            small_face: 0,
+            big_face: None,
+            small_face: None,
             sprite_id: 0,
         }
     }
@@ -63,14 +63,8 @@ impl Fight {
     pub fn new(config: &Config) -> Fight {
         let characters: Vec<_> = config.data_paths()
             .iter()
-            .map(|data_path| { find_characters(data_path) })
-            .filter_map(|char_dir| { char_dir })
-            .fold(Vec::new(), |mut v, character_dir| {
-                v.extend(character_dir);
-                v
-            })
-            .into_iter()
-            .filter_map(|character: Character| -> Option<CharaData> {
+            .flat_map(|data_path| { crate::game::mugen::character::directory_reader::read_directory_characters(data_path) })
+            .filter_map(|mut character: Character| -> Option<CharaData> {
                 let sff_data = match character.read_data() {
                     Ok(sff_data) => sff_data,
                     Err(err) => {
@@ -94,7 +88,7 @@ impl Fight {
                         .into_iter()
                         .map(|(_, animation)| { animation })
                         .collect()
-                }; 
+                };
                 Some(CharaData {
                     character,
                     sff_data,
@@ -103,6 +97,9 @@ impl Fight {
                 })
             })
             .collect();
+        if characters.is_empty() {
+            panic!("No characters found in data directories.");
+        }
         let players = [Player::new(0), Player::new(1)];
         Fight {
             characters,
@@ -121,13 +118,13 @@ impl Fight {
         for player in self.players.iter_mut() {
             let chara_data = self.characters.get(player.character_id).expect(&format!("Failed to load character {0}", player.character_id));
             let palette_index = 0;
-            let render_sff_sprite = |group_index, image_index, palette_index| {
-                let renderer: BitmapSurfaceRenderer = chara_data.sff_data.render_sprite((), group_index, image_index, palette_index).expect(&format!("Failed to render sprite for group {group_index}, image {image_index}, palette {palette_index}"));
-                renderer.take()
+            let render_sff_sprite = |group_index, image_index, palette_index| -> Result<_, nugem_sff::RenderingError<<BitmapSurfaceRenderer as nugem_sff::bitmap::BitmapRenderer>::Error>> {
+                let renderer: BitmapSurfaceRenderer = chara_data.sff_data.render_sprite((), group_index, image_index, palette_index)?;
+                Ok(renderer.take())
             };
             player.animator = Some(air::Animator::new(chara_data.animations[player.current_animation].clone()));
-            player.small_face = sprite_atlas_builder.add_surface(render_sff_sprite(9000, 0, palette_index));
-            player.big_face = sprite_atlas_builder.add_surface(render_sff_sprite(9000, 1, palette_index));
+            player.small_face = render_sff_sprite(9000, 0, palette_index).map(|s| sprite_atlas_builder.add_surface(s)).ok();
+            player.big_face = render_sff_sprite(9000, 1, palette_index).map(|s| sprite_atlas_builder.add_surface(s)).ok();
             {
                 player.image_keys.clear();
                 let animator = player.animator.as_ref().unwrap();
@@ -160,10 +157,13 @@ impl Fight {
             if let Some(animator) = player.animator.as_mut() {
                 if let Some((group, image)) = animator.current_display_info() {
                     let key = ImageKey { group, image };
-                    let sprite_id = *player.image_keys.get(&key).unwrap();
-                    let (w, h) = texture_atlas.dimensions(sprite_id);
-                    sprite_canvas.add_sprite(player.big_face, (50 + i * 300) as u32, 450, 175, 175);
-                    player.sprite_id = sprite_canvas.add_sprite(sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                    if let Some(&sprite_id) = player.image_keys.get(&key) {
+                        let (w, h) = texture_atlas.dimensions(sprite_id);
+                        if let Some(big_face) = player.big_face.clone() {
+                            sprite_canvas.add_sprite(big_face, (50 + i * 300) as u32, 450, 175, 175);
+                        }
+                        player.sprite_id = sprite_canvas.add_sprite(sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                    }
                 }
             }
         }
@@ -240,15 +240,14 @@ impl Scene for Fight {
                     if animator.tick() {
                         if let Some((group, image)) = animator.current_display_info() {
                             // change frame
-                            let sprite_id = {
-                                let key = ImageKey {
-                                    group,
-                                    image,
-                                };
-                                *player.image_keys.get(&key).unwrap()
+                            let key = ImageKey {
+                                group,
+                                image,
                             };
-                            let (w, h) = loaded_data.texture_atlas.dimensions(sprite_id);
-                            loaded_data.sprite_canvas.update_canvas(player.sprite_id, sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                            if let Some(&sprite_id) = player.image_keys.get(&key) {
+                                let (w, h) = loaded_data.texture_atlas.dimensions(sprite_id);
+                                loaded_data.sprite_canvas.update_canvas(player.sprite_id, sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                            }
                         }
                     }
                 }

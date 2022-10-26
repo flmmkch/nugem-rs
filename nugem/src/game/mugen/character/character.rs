@@ -1,28 +1,36 @@
-use std::path::{Path, PathBuf};
-use std::fs;
-use std::io::BufReader;
+use std::ffi::OsStr;
+use std::path::PathBuf;
 use super::character_info::{self, CharacterInfo};
-use super::command;
+use super::{command, file_reader};
 use crate::game::mugen::character::air::{read_air_file, Animation};
 use crate::game::mugen::format::generic_def::Categories;
 use std::collections::HashMap;
+use character_info::ValidInfo;
 use nugem_sff::v1::Palette;
 use log::error;
 
-#[derive(Debug, Clone)]
 pub struct Character {
     info: CharacterInfo,
-    path: PathBuf,
+    file_reader: Box<dyn file_reader::FileReader>,
+    character_files_path_root: PathBuf,
 }
 
-pub struct CharactersDir {
-    read_dir: fs::ReadDir,
+impl std::fmt::Debug for Character {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(stringify!(Character))
+            .field(stringify!(info), &self.info)
+            .finish()
+    }
 }
 
 impl Character {
     #[allow(dead_code)]
     pub fn name(&self) -> &str {
-        self.info["info"]["name"].as_str()
+        Self::name_from_borrowed_info(&self.info)
+    }
+
+    fn name_from_borrowed_info(info: &CharacterInfo) -> &str {
+        info["info"]["name"].as_str()
     }
 
     #[allow(dead_code)]
@@ -30,57 +38,60 @@ impl Character {
         self.info["info"]["displayname"].as_str()
     }
 
-    fn read_directory(chara_dir_path: &Path) -> Option<Character> {
-        if chara_dir_path.is_dir() {
-            let chara_dir_name = chara_dir_path.file_name()?;
-            let def_path = chara_dir_path.join(Path::new(&chara_dir_name).with_extension("def"));
-            if def_path.is_file() {
-                // read the def file
-                let file = fs::File::open(def_path).ok()?;
-                let def_info = Categories::read_def(file);
-                let character_info = character_info::read_def::<BufReader<fs::File>>(def_info)?;
-                let character = Character {
-                    info: character_info,
-                    path: chara_dir_path.to_path_buf(),
-                };
-                return Some(character);
+    /// Opens a character with a given name and file reader
+    pub fn open(name: &OsStr, mut file_reader: Box<dyn file_reader::FileReader>) -> Option<Character> {
+        let file_names: Vec<PathBuf> = file_reader.file_names().into_iter().flatten().collect();
+        let character_info_paths = file_names.iter().filter(|file_name| file_name.extension() == Some(OsStr::new("def")));
+        // try the various .def files to find the character definition
+        for character_info_path in character_info_paths {
+            let character_files_path_root = character_info_path.parent().map(PathBuf::from).unwrap_or(PathBuf::new());
+            log::debug!("Reading character info file {}", character_info_path.display());
+            let character_info_file = match file_reader.read_file(&character_info_path) {
+                Ok(character) => character,
+                Err(e) => { log::error!("Failed to read character {0}: {e}", name.to_string_lossy()); return None; },
+            };
+            let def_info = Categories::read_def(character_info_file);
+            let info = character_info::read_def(def_info);
+            if info.valid() {
+                return Some(Character {
+                    info,
+                    file_reader,
+                    character_files_path_root,
+                });
+            } else {
+                log::debug!("Ignoring file {0} for character info", character_info_path.display());
             }
         }
         None
     }
 
-    pub fn read_data(&self) -> Result<nugem_sff::SpriteFile, nugem_sff::LoadingError> {
+    pub fn read_data(&mut self) -> Result<nugem_sff::SpriteFile, nugem_sff::LoadingError> {
         let external_palettes_files: Vec<_> = self.read_external_palette_files().collect();
-        let sprite_path = self.path.join(Path::new(&self.info["files"]["sprite"]));
-        let file = fs::File::open(&sprite_path)?;
-        let buf_reader = BufReader::new(file);
-        nugem_sff::SpriteFile::read(buf_reader, external_palettes_files)
+        let sprite_path = self.character_files_path_root.join(&self.info["files"]["sprite"]);
+        let sprite_file = self.file_reader.read_file(&sprite_path)?;
+        nugem_sff::SpriteFile::read(sprite_file, external_palettes_files)
     }
 
-    pub fn read_animations(&self) -> HashMap<u32, Animation> {
-        if let Some(anim_file_name) = self.info.get("files").and_then(|f| f.get("anim")) {
-            let anim_file_path = self.path.join(&anim_file_name);
-            if let Ok(anim_file) = fs::File::open(&anim_file_path) {
-                return read_air_file(anim_file);
-            } else {
-                log::error!("Failed to read animation file for character {0}", self.name())
-            }
+    fn read_animations_opt(&mut self) -> Option<HashMap<u32, Animation>> {
+        let anim_file_name = self.info.get("files").and_then(|f| f.get("anim"))?;
+        let anim_file_path = self.character_files_path_root.join(anim_file_name);
+        let anim_file = self.file_reader.read_file(&anim_file_path).ok()?;
+        let air_file = read_air_file(anim_file);
+        Some(air_file)
+    }
+
+    pub fn read_animations(&mut self) -> HashMap<u32, Animation> {
+        if let Some(air_file) = self.read_animations_opt() {
+            air_file
         } else {
-            log::error!("Missing animation file for character {0}", self.name())
+            log::error!("Failed to read animation file for character {0}", self.name());
+            HashMap::default()
         }
-        HashMap::default()
     }
 
-    fn read_character_palette_file(palette_file: &Path) -> Result<Palette, std::io::Error>
+    fn read_external_palette_files<'a>(&'a mut self) -> impl Iterator<Item = Palette> +'a
     {
-        let file = fs::File::open(palette_file)?;
-        let reader = BufReader::new(file);
-        Palette::read(reader)
-    }
-
-    fn read_external_palette_files<'a>(&'a self) -> impl Iterator<Item = Palette> +'a
-    {
-        let character_files = &self.info["files"];
+        let (character_files, file_reader, character_files_path_root) = (&self.info["files"], &mut self.file_reader, &self.character_files_path_root);
         // iterate on palette indices
         core::iter::successors(Some(1u16), |n| n.checked_add(1))
             // palette key from index
@@ -90,61 +101,36 @@ impl Character {
             })
             // read the palette file from file name
             .filter_map(move |palette_file_name| {
+                let palette_file_path = character_files_path_root.join(palette_file_name);
+                let palette_res = file_reader.read_file(&palette_file_path).and_then(Palette::read);
                 // read the palette file
-                let palette_file_path = self.path.join(&palette_file_name);
-                match Self::read_character_palette_file(&palette_file_path) {
+                match palette_res {
                     Ok(palette) => Some(palette),
                     Err(e) => {
-                        error!("Error reading palette file {}: {}", palette_file_path.display(), e);
+                        error!("Error reading palette file {}: {}", palette_file_name, e);
                         None
                     },
                 }
             })
     }
 
-    pub fn read_commands(&self) -> Result<Vec<super::command::Command>, std::io::Error> {
-        if let Some(cmd_file_name) = self.info.get("files").and_then(|f| f.get("cmd")) {
-            let cmd_file_path = self.path.join(&cmd_file_name);
-            let cmd_file = fs::File::open(&cmd_file_path)?;
-            Ok(command::read_cmd_file(cmd_file, self.name()))
+    fn read_commands_opt(&mut self) -> Option<std::io::Result<Vec<super::command::Command>>>
+    {
+        let (info, file_reader) = (&self.info, &mut self.file_reader);
+        let character_name = Self::name_from_borrowed_info(&info);
+        let cmd_file_name = info.get("files").and_then(|f| f.get("cmd"))?;
+        let cmd_file_path = self.character_files_path_root.join(&cmd_file_name);
+        let result = file_reader.read_file(&cmd_file_path)
+            .map(|cmd_file| command::read_cmd_file(cmd_file, character_name));
+        Some(result)
+    }
+
+    pub fn read_commands(&mut self) -> Result<Vec<super::command::Command>, std::io::Error> {
+        if let Some(cmd_result) = self.read_commands_opt() {
+            cmd_result
         } else {
             log::error!("Missing command file for character {0}", self.name());
             Ok(Default::default())
         }
-    }
-}
-
-impl Iterator for CharactersDir {
-    type Item = Character;
-
-    fn next(&mut self) -> Option<Character> {
-        match self.read_dir.next() {
-            Some(entry_result) => {
-                match entry_result {
-                    Ok(entry) => {
-                        let path_buf = entry.path();
-                        if let Some(character) = Character::read_directory(path_buf.as_path()) {
-                            Some(character)
-                        }
-                        else {
-                            self.next()
-                        }
-                    },
-                    _ => self.next(),
-                }
-            }
-            None => None,
-        }
-    }
-}
-
-pub fn find_characters(directory_path: &Path) -> Option<CharactersDir> {
-    match fs::read_dir(directory_path) {
-        Ok(main_directory) => {
-            Some(CharactersDir {
-                read_dir: main_directory
-            })
-        },
-        _ => None,
     }
 }

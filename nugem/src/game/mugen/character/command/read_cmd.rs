@@ -86,7 +86,7 @@ pub fn read_cmd_file<R: Read>(read: R, character_name: &str) -> Vec<Command> {
             "statedef -1" => reading_statedef = true,
             state_trigger => {
                 // State triggers
-                log::info!("state trigger not handled for character {character_name}: {state_trigger}");
+                // TODO
             },
         }
     }

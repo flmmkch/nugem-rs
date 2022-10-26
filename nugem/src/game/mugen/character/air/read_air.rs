@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 use crate::game::mugen::format::generic_def::{DefLine, Categories};
-use std::fs::File;
 use std::io::BufReader;
 use regex::Regex;
 use lazy_static::lazy_static;
 use super::*;
 
-pub fn read_air_file(cmd_file: File) -> HashMap<u32, Animation>  {
+pub fn read_air_file<R: std::io::Read>(read: R) -> HashMap<u32, Animation>  {
     let mut result_map = HashMap::new();
-    for (_, category) in Categories::read_def(BufReader::new(cmd_file)) {
+    for (_, category) in Categories::read_def(BufReader::new(read)) {
         let cat_name = category.name().to_lowercase();
         lazy_static! {
             static ref REGEX_BEGIN_ACTION: Regex = Regex::new("^begin action ([0-9]+)$").unwrap();

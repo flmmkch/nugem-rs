@@ -60,7 +60,7 @@ impl SpriteFile {
             Ok(SpriteFile::V2(d))
         }
         else {
-            Err(LoadingError::UnknownVersion)
+            Err(LoadingError::UnknownVersion(v_buffer))
         }
     }
 }

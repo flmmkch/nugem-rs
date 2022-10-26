@@ -9,8 +9,8 @@ pub enum LoadingError {
     NoSignature,
     #[error("Error loading sprite data")]
     IoError(#[from] io::Error),
-    #[error("Unknown sprite file version")]
-    UnknownVersion,
+    #[error("Unknown sprite file version bytes {0:?}")]
+    UnknownVersion([u8; 4]),
 }
 
 #[derive(Debug, Error)]

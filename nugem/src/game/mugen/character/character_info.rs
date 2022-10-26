@@ -19,7 +19,7 @@ impl ValidInfo for CharacterInfo {
     }
 }
 
-pub fn read_def<T: BufRead>(def_categories: Categories<T>) -> Option<CharacterInfo> {
+pub fn read_def<T: BufRead>(def_categories: Categories<T>) -> CharacterInfo {
     let mut character_info = CharacterInfo::new();
     for (_, category) in def_categories {
         let cat_name = category.name().to_lowercase();
@@ -34,12 +34,6 @@ pub fn read_def<T: BufRead>(def_categories: Categories<T>) -> Option<CharacterIn
             }
         }
     }
-    if character_info.valid() {
-        Some(character_info)
-    }
-    else {
-        log::error!("Invalid character info");
-        None
-    }
+    character_info
 }
 
