@@ -67,7 +67,7 @@ impl Game {
             // dispatched any events. This is ideal for games and similar applications.
             control_flow.set_poll();
 
-            fn process_input_event(input_manager_result: Option<input::event::Event>, current_scene: &mut Box<dyn scene::Scene>, event_loop_sender: events::EventLoopSender, control_flow: &mut winit::event_loop::ControlFlow) {
+            fn process_input_event(input_manager_result: Option<input::event::Event>, current_scene: &mut Box<dyn scene::Scene>, event_loop_sender: &events::EventLoopSender, control_flow: &mut winit::event_loop::ControlFlow) {
                 if let Some(input_event) = input_manager_result {
                     if let Some(global_event) = current_scene.input_event(input_event) {
                         if let Err(event_loop_closed) = event_loop_sender.send_event(global_event) {
@@ -78,6 +78,9 @@ impl Game {
                 }
             }
 
+            while let Some(gamepad_event) = self.input_manager.process_next_gamepad_event() {
+                process_input_event(Some(gamepad_event), self.current_scene.get_mut().unwrap(), &event_loop_proxy, control_flow);
+            }
 
             match event {
                 WinitEv::UserEvent(NugemEvent::Quit) | WinitEv::WindowEvent {
@@ -94,11 +97,7 @@ impl Game {
                 WinitEv::WindowEvent { event: winit::event::WindowEvent::ScaleFactorChanged{ new_inner_size, scale_factor: _scale_factor }, .. } => self.graphics_state.resize(new_inner_size.clone()),
                 // input handling
                 // keyboard input on window
-                WinitEv::WindowEvent { event: winit::event::WindowEvent::KeyboardInput { device_id, input, .. }, .. } => process_input_event(self.input_manager.process_keyboard_input_event(device_id, input), self.current_scene.get_mut().unwrap(), event_loop_proxy.clone(), control_flow),
-                // controller axis motion on window
-                WinitEv::WindowEvent { event: winit::event::WindowEvent::AxisMotion { device_id, axis, value, .. }, .. } => process_input_event(self.input_manager.process_controller_axis_event(device_id, axis, value), self.current_scene.get_mut().unwrap(), event_loop_proxy.clone(), control_flow),
-                // device event
-                WinitEv::DeviceEvent { device_id, event: device_event } => process_input_event(self.input_manager.process_device_event(device_id, device_event), self.current_scene.get_mut().unwrap(), event_loop_proxy.clone(), control_flow),
+                WinitEv::WindowEvent { event: winit::event::WindowEvent::KeyboardInput { device_id, input, .. }, .. } => process_input_event(self.input_manager.process_keyboard_input_event(device_id, input), self.current_scene.get_mut().unwrap(), &event_loop_proxy, control_flow),
                 WinitEv::MainEventsCleared => {
                     // Application update code.
 

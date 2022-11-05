@@ -1,16 +1,17 @@
 use super::*;
-use winit::event::{DeviceId, DeviceEvent, ElementState, KeyboardInput};
+use winit::event::{DeviceId, ElementState, KeyboardInput};
 use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Manager {
     devices_map: HashMap<DeviceKey, Device>,
+    gilrs: Option<gilrs::Gilrs>,
 }
 
-#[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
-struct DeviceKey {
-    device_type: DeviceType,
-    device_id: DeviceId,
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+enum DeviceKey {
+    Keyboard { device_id: DeviceId, keyboard_id: u32 },
+    Gamepad { gamepad_id: gilrs::GamepadId },
 }
 
 impl From<ElementState> for ButtonState {
@@ -22,28 +23,30 @@ impl From<ElementState> for ButtonState {
     }
 }
 
-fn controller_button(winit_button: u32) -> Option<Button> {
-    // xbox 360 mappings
-    // TODO use loaded controller mappings or a library for that
-    match winit_button {
-        0 => Some(Button::A),
-        1 => Some(Button::B),
-        2 => Some(Button::X),
-        3 => Some(Button::Y),
-        4 => Some(Button::C), // left shoulder
-        5 => Some(Button::Z), // right shoulder
-        6 => Some(Button::Back),
-        7 => Some(Button::Start),
+fn controller_button(button: gilrs::Button) -> Option<Button> {
+    match button {
+        gilrs::Button::West => Some(Button::A),
+        gilrs::Button::North => Some(Button::B),
+        gilrs::Button::South => Some(Button::X),
+        gilrs::Button::East => Some(Button::Y),
+        gilrs::Button::C => Some(Button::C),
+        gilrs::Button::Z => Some(Button::Z),
+        gilrs::Button::Select => Some(Button::Back),
+        gilrs::Button::Start => Some(Button::Start),
         _ => None,
     }
 }
 
-pub const MOTION_AXIS_THRESHOLD : f64 = <f64>::MAX / 3f64;
+pub const MOTION_AXIS_THRESHOLD : f32 = 0.3;
+
+fn initialize_gamepad(gamepad_id: gilrs::GamepadId, gilrs: &gilrs::Gilrs) -> super::Device {
+    super::Device::new_gamepad(gilrs.gamepad(gamepad_id))
+}
 
 macro_rules! process_controller_event {
-    ($input: expr, $input_ident: ident, $device_id: expr, $devices_map:expr) => {{
-        let device_key = DeviceKey { device_type: DeviceType::GameController, device_id: $device_id };
-        let device = $devices_map.entry(device_key).or_insert_with(|| super::Device::new(DeviceType::GameController, "".into(), State::new()));
+    ($input: expr, $input_ident: ident, $gamepad_id: expr, $manager:ident) => {{
+        let device_key = DeviceKey::Gamepad { gamepad_id: $gamepad_id };
+        let device = $manager.devices_map.entry(device_key).or_insert_with(|| initialize_gamepad($gamepad_id, $manager.gilrs.as_ref().unwrap()));
         let processed_partial_state_opt = {
             let mut partial_state = PartialState::new();
             partial_state.$input_ident = Some($input);
@@ -64,11 +67,14 @@ macro_rules! process_controller_event {
 
 impl Manager {
     pub fn initialize() -> Self {
+        let gilrs = match gilrs::Gilrs::new() {
+            Ok(gilrs) => Some(gilrs),
+            Err(e) => { log::error!("Error initializing controller handling: {e}"); None },
+        };
         let manager = Self {
             devices_map: Default::default(),
+            gilrs,
         };
-        // load controller mappings
-        // TODO
         manager
     }
     pub fn process_keyboard_input_event(&mut self, device_id: DeviceId, keyboard_input: KeyboardInput) -> Option<event::Event> {
@@ -79,8 +85,8 @@ impl Manager {
 
         macro_rules! process_keyboard_event {
             ($input: expr, $input_ident: ident, $device_id: expr, $keyboard_id: expr) => {{
-                let device_key = DeviceKey { device_type: DeviceType::Keyboard($keyboard_id), device_id };
-                let device = self.devices_map.entry(device_key).or_insert_with(|| super::Device::new(DeviceType::Keyboard($keyboard_id), "".into(), State::new()));
+                let device_key = DeviceKey::Keyboard { keyboard_id: $keyboard_id, device_id };
+                let device = self.devices_map.entry(device_key).or_insert_with(|| Device::new_keyboard($keyboard_id));
                 let processed_partial_state_opt = {
                     let mut partial_state = PartialState::new();
                     partial_state.$input_ident = Some($input);
@@ -139,14 +145,17 @@ impl Manager {
             _ => None,
         }
     }
-    pub fn process_controller_axis_event(&mut self, device_id: DeviceId, axis: u32, value: f64) -> Option<event::Event> {
+    pub fn process_controller_axis_event(&mut self, gamepad_id: gilrs::GamepadId, axis: gilrs::Axis, value: f32) -> Option<event::Event> {
         let direction_motion_opt = {
             use DirectionalMotion::*;
             use DirectionState::*;
-            let positive = value > MOTION_AXIS_THRESHOLD;
-            let negative = value < -MOTION_AXIS_THRESHOLD;
+            let gilrs = self.gilrs.as_ref().unwrap();
+            let gamepad = gilrs.gamepad(gamepad_id);
+            let deadzone = gamepad.axis_code(axis).and_then(|code| gamepad.deadzone(code)).unwrap_or(MOTION_AXIS_THRESHOLD);
+            let positive = value > deadzone;
+            let negative = value < -deadzone;
             match axis {
-                0 => {
+                gilrs::Axis::LeftStickX | gilrs::Axis::DPadX => {
                     // horizontal
                     match (positive, negative) {
                         (true, false) => Some(Horizontal(Plus)),
@@ -155,7 +164,7 @@ impl Manager {
                         _ => None
                     }
                 },
-                1 => {
+                gilrs::Axis::LeftStickY | gilrs::Axis::DPadY => {
                     // vertical
                     match (positive, negative) {
                         (true, false) => Some(Vertical(Minus)),
@@ -168,53 +177,64 @@ impl Manager {
             }
         };
         if let Some(direction_motion) = direction_motion_opt {
-            process_controller_event!(direction_motion, directional, device_id, &mut self.devices_map)
+            process_controller_event!(direction_motion, directional, gamepad_id, self)
         }
         else {
             None
         }
     }
-    pub fn process_device_event(&mut self, device_id: DeviceId, device_event: DeviceEvent) -> Option<event::Event> {
+    pub fn process_next_gamepad_event(&mut self) -> Option<event::Event> {
         macro_rules! process_controller_button {
             ($input_state_option: expr, $input_button: expr, $which: expr) => (
                 match $input_button {
-                    Button::A => process_controller_event!($input_state_option, a, $which, &mut self.devices_map),
-                    Button::B => process_controller_event!($input_state_option, b, $which, &mut self.devices_map),
-                    Button::C => process_controller_event!($input_state_option, c, $which, &mut self.devices_map),
-                    Button::X => process_controller_event!($input_state_option, x, $which, &mut self.devices_map),
-                    Button::Y => process_controller_event!($input_state_option, y, $which, &mut self.devices_map),
-                    Button::Z => process_controller_event!($input_state_option, z, $which, &mut self.devices_map),
-                    Button::Start => process_controller_event!($input_state_option, start, $which, &mut self.devices_map),
-                    Button::Back => process_controller_event!($input_state_option, back, $which, &mut self.devices_map),
+                    Button::A => process_controller_event!($input_state_option, a, $which, self),
+                    Button::B => process_controller_event!($input_state_option, b, $which, self),
+                    Button::C => process_controller_event!($input_state_option, c, $which, self),
+                    Button::X => process_controller_event!($input_state_option, x, $which, self),
+                    Button::Y => process_controller_event!($input_state_option, y, $which, self),
+                    Button::Z => process_controller_event!($input_state_option, z, $which, self),
+                    Button::Start => process_controller_event!($input_state_option, start, $which, self),
+                    Button::Back => process_controller_event!($input_state_option, back, $which, self),
                 }
             )
         }
-        match device_event {
-            DeviceEvent::Added => {
-                // TODO
-                None
-            },
-            DeviceEvent::Removed => {
-                // TODO
-                None
-            },
-            DeviceEvent::Button { button, state } => {
-                let button_state: ButtonState = state.into();
 
-                if let Some(input_button) = controller_button(button) {
-                    process_controller_button!(button_state, input_button, device_id)
-                }
-                else {
+        if let Some((gilrs, event)) = self.gilrs.as_mut().and_then(|g| g.next_event().map(|e| (g, e))) {
+            match event {
+                gilrs::Event { id, event: gilrs::EventType::ButtonPressed(gilrs_button, _), .. } => {
+                    if let Some(input_button) = controller_button(gilrs_button) {
+                        process_controller_button!(ButtonState::Down, input_button, id)
+                    }
+                    else {
+                        None
+                    }
+                },
+                gilrs::Event { id, event: gilrs::EventType::ButtonReleased(gilrs_button, _), .. } => {
+                    if let Some(input_button) = controller_button(gilrs_button) {
+                        process_controller_button!(ButtonState::Up, input_button, id)
+                    }
+                    else {
+                        None
+                    }
+                },
+                gilrs::Event { id, event: gilrs::EventType::AxisChanged(axis, value, _), .. } => {
+                    self.process_controller_axis_event(id, axis, value)
+                },
+                gilrs::Event { id: gamepad_id, event: gilrs::EventType::Connected, .. } => {
+                    log::info!("Controller connected : {0}.", gilrs.gamepad(gamepad_id).name());
+                    self.devices_map.insert(DeviceKey::Gamepad { gamepad_id }, initialize_gamepad(gamepad_id, gilrs));
                     None
                 }
-            },
-            DeviceEvent::Motion { axis, value } => self.process_controller_axis_event(device_id, axis, value),
-            DeviceEvent::Text { codepoint } => {
-                log::debug!("Input event of type text with codepoint {codepoint}");
-                None
-            },
-            DeviceEvent::Key(keyboard_input) => self.process_keyboard_input_event(device_id, keyboard_input),
-            _ => None,
+                gilrs::Event { id: gamepad_id, event: gilrs::EventType::Disconnected, .. } => {
+                    log::info!("Controller disconnected : {0}.", gilrs.gamepad(gamepad_id).name());
+                    self.devices_map.remove(&DeviceKey::Gamepad { gamepad_id });
+                    None
+                },
+                _ => None,
+            }
+        }
+        else {
+            None
         }
     }
 }
