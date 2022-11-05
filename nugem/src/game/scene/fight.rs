@@ -1,14 +1,14 @@
 use super::Scene;
-use crate::game::graphics::surface::BitmapSurfaceRenderer;
 use crate::game::mugen::character::{Character, command};
 use crate::game::mugen::character::air;
-use crate::game::graphics::window::Window;
-use crate::game::graphics::sprite_displayer;
+use crate::game::graphics::{self, surface::BitmapSurfaceRenderer};
 use crate::game::Config;
 use crate::game::events;
 use crate::game::input::{self, DirectionState, DirectionalMotion, Directional};
 use std::collections::{BTreeMap, HashMap};
 use log::error;
+
+const SCREEN_DIMENSIONS: (u32, u32) = (800, 600);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 struct ImageKey {
@@ -27,16 +27,17 @@ struct Player {
 }
 
 struct FightData {
-    pub texture_atlas: sprite_displayer::SpriteTextureAtlas,
-    pub sprite_context: sprite_displayer::DrawingContext,
-    pub sprite_canvas: sprite_displayer::SpritesDrawer,
+    pub texture_atlas: graphics::sprites::SpriteTextureAtlas,
+    pub sprite_stack: graphics::sprites::SpriteStack,
 }
 
 struct CharaData {
-    pub character: Character,
+    // TODO
+    pub _character: Character,
     pub sff_data: nugem_sff::SpriteFile,
     pub animations: Vec<air::Animation>,
-    pub commands: Vec<command::Command>,
+    // TODO use commands
+    pub _commands: Vec<command::Command>,
 }
 
 pub struct Fight {
@@ -60,49 +61,10 @@ impl Player {
 }
 
 impl Fight {
-    pub fn new(config: &Config) -> Fight {
-        let characters: Vec<_> = config.data_paths()
-            .iter()
-            .flat_map(|data_path| { crate::game::mugen::character::directory_reader::read_directory_characters(data_path) })
-            .filter_map(|mut character: Character| -> Option<CharaData> {
-                let sff_data = match character.read_data() {
-                    Ok(sff_data) => sff_data,
-                    Err(err) => {
-                        log::error!("Error loading sprite data for {0}: {1}", character.name(), err);
-                        None?
-                    }
-                };
-                let commands = match character.read_commands() {
-                    Ok(commands) => commands,
-                    Err(err) => {
-                        log::error!("Error loading command data for {0}: {1}", character.name(), err);
-                        None?
-                    }
-                };
-                let animations : Vec<_> = {
-                    // first use a btreemap for the animations to be in order
-                    character
-                        .read_animations()
-                        .into_iter()
-                        .collect::<BTreeMap<u32, air::Animation>>()
-                        .into_iter()
-                        .map(|(_, animation)| { animation })
-                        .collect()
-                };
-                Some(CharaData {
-                    character,
-                    sff_data,
-                    animations,
-                    commands,
-                })
-            })
-            .collect();
-        if characters.is_empty() {
-            panic!("No characters found in data directories.");
-        }
+    pub fn new(_: &Config) -> Fight {
         let players = [Player::new(0), Player::new(1)];
         Fight {
-            characters,
+            characters: Vec::new(),
             loaded_data: None,
             players,
         }
@@ -113,8 +75,8 @@ impl Fight {
     pub fn unload(&mut self) {
         self.loaded_data = None;
     }
-    pub fn load(&mut self, window: &mut Window) {
-        let mut sprite_atlas_builder = sprite_displayer::TextureAtlasBuilder::new();
+    pub fn load(&mut self, state: &graphics::State) {
+        let mut sprite_atlas_builder = graphics::sprites::SpriteTextureAtlasBuilder::new();
         for player in self.players.iter_mut() {
             let chara_data = self.characters.get(player.character_id).expect(&format!("Failed to load character {0}", player.character_id));
             let palette_index = 0;
@@ -149,28 +111,26 @@ impl Fight {
                 }
             }
         }
-        let texture_atlas = sprite_atlas_builder.build(window.factory()).unwrap();
-        let sprite_context = sprite_displayer::DrawingContext::new(window.factory());
-        let mut sprite_canvas = sprite_displayer::SpritesDrawer::new();
-        for i in 0..self.players.len() {
-            let player = &mut self.players[i];
+        let texture_atlas = sprite_atlas_builder.build(state).unwrap();
+        let mut sprite_stack_drawer = graphics::sprites::SpriteStack::new(state.device(), state.surface_configuration().format, SCREEN_DIMENSIONS);
+        sprite_stack_drawer.set_texture_atlas(&texture_atlas, state.device());
+        for (player_number, player) in self.players.iter_mut().enumerate() {
             if let Some(animator) = player.animator.as_mut() {
                 if let Some((group, image)) = animator.current_display_info() {
                     let key = ImageKey { group, image };
                     if let Some(&sprite_id) = player.image_keys.get(&key) {
-                        let (w, h) = texture_atlas.dimensions(sprite_id);
+                        let (w, h) = texture_atlas.dimensions(sprite_id).unwrap();
                         if let Some(big_face) = player.big_face.clone() {
-                            sprite_canvas.add_sprite(big_face, (50 + i * 300) as u32, 450, 175, 175);
+                            sprite_stack_drawer.push_sprite(big_face, (50 + player_number * 300) as u32, 400, 175, 175);
                         }
-                        player.sprite_id = sprite_canvas.add_sprite(sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                        player.sprite_id = sprite_stack_drawer.push_sprite(sprite_id, (50 + player_number * 300) as u32, 200, w * 2, h * 2);
                     }
                 }
             }
         }
         self.loaded_data = Some(FightData {
             texture_atlas,
-            sprite_context,
-            sprite_canvas,
+            sprite_stack: sprite_stack_drawer,
         });
     }
     fn wheel_selection(current: usize, max: usize, move_by: isize) -> usize {
@@ -199,60 +159,103 @@ impl Fight {
     }
 }
 
-impl Scene for Fight {
-    fn update(&mut self, window: &mut Window, event_queue: &mut events::EventQueue, _: &Config) -> bool {
-        match event_queue.pop() {
-            Some(event) => {
-                match event {
-                    events::Event::Quit => return false,
-                    events::Event::Input(input_event) => {
-                        // quit on pressing back
-                        if input_event.partial_state.back == Some(input::ButtonState::Down) {
-                            return false;
-                        }
-                        log::debug!("Got input event {input_event:?}");
-                        if let Some(motion) = input_event.partial_state.directional {
-                            match motion {
-                                DirectionalMotion::Vertical(DirectionState::Plus) | DirectionalMotion::FullDirection(Directional::Up) => self.change_character(1),
-                                DirectionalMotion::Vertical(DirectionState::Minus) | DirectionalMotion::FullDirection(Directional::Down) => self.change_character(-1),
-                                DirectionalMotion::Horizontal(DirectionState::Plus) | DirectionalMotion::FullDirection(Directional::Forward) => self.change_animation(1),
-                                DirectionalMotion::Horizontal(DirectionState::Minus) | DirectionalMotion::FullDirection(Directional::Backward) => self.change_animation(-1),
-                                _ => (),
-                            }
-                        }
-                    },
-                }
-            },
-            None => (),
+impl Scene for Fight {    
+    fn load(&mut self, graphics_state: &graphics::State, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+        let characters_iterator = config.data_paths()
+            .iter()
+            .flat_map(|data_path| { crate::game::mugen::character::directory_reader::read_directory_characters(data_path) })
+            .filter_map(|mut character: Character| -> Option<CharaData> {
+                let sff_data = match character.read_data() {
+                    Ok(sff_data) => sff_data,
+                    Err(err) => {
+                        log::error!("Error loading sprite data for {0}: {1}", character.name(), err);
+                        None?
+                    }
+                };
+                let commands = match character.read_commands() {
+                    Ok(commands) => commands,
+                    Err(err) => {
+                        log::error!("Error loading command data for {0}: {1}", character.name(), err);
+                        None?
+                    }
+                };
+                let animations : Vec<_> = {
+                    // first use a btreemap for the animations to be in order
+                    character
+                        .read_animations()
+                        .into_iter()
+                        .collect::<BTreeMap<u32, air::Animation>>()
+                        .into_iter()
+                        .map(|(_, animation)| { animation })
+                        .collect()
+                };
+                Some(CharaData {
+                    _character: character,
+                    sff_data,
+                    animations,
+                    _commands: commands,
+                })
+            })
+            ;
+        self.characters.clear();
+        self.characters.extend(characters_iterator);
+        if self.characters.is_empty() {
+            Err("No characters found in data directories.")?
         }
+        self.load(graphics_state);
+        Ok(())
+    }
+
+    fn input_event(&mut self, input_event: input::event::Event) -> Option<events::Event> {
+        // quit on pressing back
+        if input_event.partial_state.back == Some(input::ButtonState::Down) {
+            return Some(events::Event::Quit);
+        }
+        if let Some(motion) = input_event.partial_state.directional {
+            match motion {
+                DirectionalMotion::Vertical(DirectionState::Plus) | DirectionalMotion::FullDirection(Directional::Up) => self.change_character(1),
+                DirectionalMotion::Vertical(DirectionState::Minus) | DirectionalMotion::FullDirection(Directional::Down) => self.change_character(-1),
+                DirectionalMotion::Horizontal(DirectionState::Plus) | DirectionalMotion::FullDirection(Directional::Forward) => self.change_animation(1),
+                DirectionalMotion::Horizontal(DirectionState::Minus) | DirectionalMotion::FullDirection(Directional::Backward) => self.change_animation(-1),
+                _ => (),
+            }
+        }
+        None
+    }
+
+    fn update(&mut self, graphics_state: &graphics::State, _: &Config, _: events::EventLoopSender) -> bool {
         if !self.loaded() {
-            self.load(window);
+            self.load(graphics_state);
         }
         true
     }
 
-    fn display(&mut self, window: &mut Window) {
-        if let Some(loaded_data) = self.loaded_data.as_mut() {
-            let (factory, encoder, render_target_view) = window.gfx_data();
-            for i in 0..self.players.len() {
-                let player = &mut self.players[i];
-                if let Some(animator) = player.animator.as_mut() {
-                    if animator.tick() {
-                        if let Some((group, image)) = animator.current_display_info() {
-                            // change frame
-                            let key = ImageKey {
-                                group,
-                                image,
-                            };
-                            if let Some(&sprite_id) = player.image_keys.get(&key) {
-                                let (w, h) = loaded_data.texture_atlas.dimensions(sprite_id);
-                                loaded_data.sprite_canvas.update_canvas(player.sprite_id, sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+    fn display(&mut self, graphics_state: &graphics::State) {
+        if let Ok(output) = graphics_state.surface().get_current_texture() {
+            let surface_texture_view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+            if let Some(loaded_data) = self.loaded_data.as_mut() {
+                for i in 0..self.players.len() {
+                    let player = &mut self.players[i];
+                    if let Some(animator) = player.animator.as_mut() {
+                        if animator.tick() {
+                            if let Some((group, image)) = animator.current_display_info() {
+                                // change frame
+                                let key = ImageKey {
+                                    group,
+                                    image,
+                                };
+                                if let Some(&sprite_id) = player.image_keys.get(&key) {
+                                    let (w, h) = loaded_data.texture_atlas.dimensions(sprite_id).unwrap();
+                                    loaded_data.sprite_stack.update_sprite(player.sprite_id, sprite_id, (50 + i * 300) as u32, 200, w * 2, h * 2);
+                                }
                             }
                         }
                     }
                 }
+                loaded_data.sprite_stack.apply_changes(&loaded_data.texture_atlas, graphics_state.device(), graphics_state.queue());
+                loaded_data.sprite_stack.render(&surface_texture_view, graphics_state.device(), graphics_state.queue());
             }
-            loaded_data.sprite_canvas.draw(&loaded_data.sprite_context, &loaded_data.texture_atlas, factory, encoder, render_target_view);
+            output.present();
         }
     }
 }

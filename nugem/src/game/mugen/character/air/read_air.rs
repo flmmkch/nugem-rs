@@ -32,7 +32,8 @@ pub fn read_air_file<R: std::io::Read>(read: R) -> HashMap<u32, Animation>  {
                                 }
                             }
                             else {
-                                if let Some(collision_default) = REGEX_CLSN_DEFAULT.captures(&line_string.as_str()) {
+                                if let Some(_collision_default) = REGEX_CLSN_DEFAULT.captures(&line_string.as_str()) {
+                                    // TODO
                                 }
                                 else {
                                     match line_string.as_str() {

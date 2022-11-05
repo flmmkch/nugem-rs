@@ -133,7 +133,3 @@ impl Drop for OpenArchive {
         }
     }
 }
-
-struct OpenArchiveFile<'a> {
-    owner: std::marker::PhantomData<&'a OpenArchive>,
-}

@@ -1,11 +1,13 @@
 use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 
-pub mod rar;
-
 pub mod fs;
 
+#[cfg(feature = "zip")]
 pub mod zip;
+
+#[cfg(feature = "rar")]
+pub mod rar;
 
 pub trait ReadSeek: Read + Seek {}
 

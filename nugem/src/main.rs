@@ -1,9 +1,8 @@
 pub mod game;
-use game::Game;
+use game::{Config, Game};
 
 fn main() {
     env_logger::init();
-    let sdl_context = sdl2::init().expect("Unable to initialize SDL2 context.");
-    let game = Game::new(&sdl_context);
-    game.run();
+    let game = pollster::block_on(Game::new(Config::new()));
+    pollster::block_on(game.run())
 }

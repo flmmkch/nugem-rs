@@ -9,7 +9,7 @@ pub fn read_cmd_file<R: Read>(read: R, character_name: &str) -> Vec<Command> {
     let mut default_time = 15;
     let mut default_buffer_time = 1;
     let mut commands = Vec::new();
-    let mut reading_statedef = false;
+    let mut _reading_statedef = false;
     for (_, category) in Categories::read_def(read) {
         let cat_name = category.name().to_lowercase();
         match cat_name.as_str() {
@@ -83,8 +83,8 @@ pub fn read_cmd_file<R: Read>(read: R, character_name: &str) -> Vec<Command> {
                     commands.push(command);
                 }
             },
-            "statedef -1" => reading_statedef = true,
-            state_trigger => {
+            "statedef -1" => _reading_statedef = true,
+            _state_trigger => {
                 // State triggers
                 // TODO
             },

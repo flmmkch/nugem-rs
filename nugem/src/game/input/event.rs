@@ -1,7 +1,7 @@
-use super::PartialState;
+use super::{PartialState, Device};
 
-#[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
-pub struct Event {
-    pub device_id: usize,
+#[derive(Clone, Debug)]
+pub struct Event<'a> {
+    pub device: &'a Device,
     pub partial_state: PartialState,
 }

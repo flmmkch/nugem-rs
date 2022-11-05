@@ -1,203 +1,220 @@
 use super::*;
+use winit::event::{DeviceId, DeviceEvent, ElementState, KeyboardInput};
 use std::collections::HashMap;
-use sdl2::{self, GameControllerSubsystem, JoystickSubsystem};
-use std::io::{BufRead, BufReader, Cursor};
 
 #[derive(Debug)]
 pub struct Manager {
-    sdl_gc: GameControllerSubsystem,
-    sdl_joystick: JoystickSubsystem,
-    devices: Vec<Device>,
-    device_sdl_map: HashMap<DeviceKey, usize>,
+    devices_map: HashMap<DeviceKey, Device>,
 }
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 struct DeviceKey {
     device_type: DeviceType,
-    sdl_id: usize,
+    device_id: DeviceId,
 }
 
-fn controller_button(sdl_button: sdl2::controller::Button) -> Option<Button> {
-    match sdl_button {
-        sdl2::controller::Button::A => Some(Button::A),
-        sdl2::controller::Button::B => Some(Button::B),
-        sdl2::controller::Button::LeftShoulder => Some(Button::C),
-        sdl2::controller::Button::X => Some(Button::X),
-        sdl2::controller::Button::Y => Some(Button::Y),
-        sdl2::controller::Button::RightShoulder => Some(Button::Z),
-        sdl2::controller::Button::Start => Some(Button::Start),
-        sdl2::controller::Button::Back => Some(Button::Back),
+impl From<ElementState> for ButtonState {
+    fn from(value: ElementState) -> Self {
+        match value {
+            ElementState::Pressed => ButtonState::Down,
+            ElementState::Released => ButtonState::Up,
+        }
+    }
+}
+
+fn controller_button(winit_button: u32) -> Option<Button> {
+    // xbox 360 mappings
+    // TODO use loaded controller mappings or a library for that
+    match winit_button {
+        0 => Some(Button::A),
+        1 => Some(Button::B),
+        2 => Some(Button::X),
+        3 => Some(Button::Y),
+        4 => Some(Button::C), // left shoulder
+        5 => Some(Button::Z), // right shoulder
+        6 => Some(Button::Back),
+        7 => Some(Button::Start),
         _ => None,
     }
 }
 
-pub const SDL_AXIS_THRESHOLD : i16 = 32767 / 3;
+pub const MOTION_AXIS_THRESHOLD : f64 = <f64>::MAX / 3f64;
+
+macro_rules! process_controller_event {
+    ($input: expr, $input_ident: ident, $device_id: expr, $devices_map:expr) => {{
+        let device_key = DeviceKey { device_type: DeviceType::GameController, device_id: $device_id };
+        let device = $devices_map.entry(device_key).or_insert_with(|| super::Device::new(DeviceType::GameController, "".into(), State::new()));
+        let processed_partial_state_opt = {
+            let mut partial_state = PartialState::new();
+            partial_state.$input_ident = Some($input);
+            device.process_state(partial_state)
+        };
+        if let Some(partial_state) = processed_partial_state_opt {
+            let event = super::event::Event {
+                device,
+                partial_state,
+            };
+            Some(event)
+        }
+        else {
+            None
+        }
+    }}
+}
 
 impl Manager {
-    pub fn new(sdl: &sdl2::Sdl) -> Manager {
-        let mut manager = Manager {
-            sdl_gc: sdl.game_controller().unwrap(),
-            sdl_joystick: sdl.joystick().unwrap(),
-            devices: Vec::new(),
-            device_sdl_map: HashMap::new(),
+    pub fn initialize() -> Self {
+        let manager = Self {
+            devices_map: Default::default(),
         };
-        manager.initialize();
+        // load controller mappings
+        // TODO
         manager
     }
-    fn initialize(&mut self) {
-        self.sdl_joystick.set_event_state(true);
-        self.sdl_gc.set_event_state(true);
-        // load controller mappings
-        // for now the mappings are determined at compile time
-        {
-            let buf_read = BufReader::new(Cursor::new(include_str!("gamecontrollerdb.txt")));
-            for line_res in buf_read.lines() {
-                if let Ok(line) = line_res {
-                    if let Ok(_) = self.sdl_gc.add_mapping(line.as_str()) {
-                        ()
+    pub fn process_keyboard_input_event(&mut self, device_id: DeviceId, keyboard_input: KeyboardInput) -> Option<event::Event> {
+        use winit::event::VirtualKeyCode;
+        use DirectionalMotion::*;
+        use DirectionState::*;
+        let KeyboardInput { scancode: _, virtual_keycode, state, .. } = keyboard_input;
+
+        macro_rules! process_keyboard_event {
+            ($input: expr, $input_ident: ident, $device_id: expr, $keyboard_id: expr) => {{
+                let device_key = DeviceKey { device_type: DeviceType::Keyboard($keyboard_id), device_id };
+                let device = self.devices_map.entry(device_key).or_insert_with(|| super::Device::new(DeviceType::Keyboard($keyboard_id), "".into(), State::new()));
+                let processed_partial_state_opt = {
+                    let mut partial_state = PartialState::new();
+                    partial_state.$input_ident = Some($input);
+                    device.process_state(partial_state)
+                };
+                if let Some(partial_state) = processed_partial_state_opt {
+                    let event = super::event::Event {
+                        device,
+                        partial_state,
+                    };
+                    Some(event)
+                }
+                else {
+                    None
+                }
+            }}
+        }
+
+        let button_state: ButtonState = state.into();
+        // TODO handle non-qwerty keyboards
+        match (virtual_keycode, button_state) {
+            // alphanumerical keys mapping: WASD for direction, U/I/O for A/B/C buttons, J/K/L for X/Y/Z buttons, return (enter) for start, backspace for back
+            (Some(VirtualKeyCode::A), ButtonState::Down) => process_keyboard_event!(Horizontal(Minus), directional, device_id, 0),
+            (Some(VirtualKeyCode::D), ButtonState::Down) => process_keyboard_event!(Horizontal(Plus), directional, device_id, 0),
+            (Some(VirtualKeyCode::W), ButtonState::Down) => process_keyboard_event!(Vertical(Minus), directional, device_id, 0),
+            (Some(VirtualKeyCode::S), ButtonState::Down) => process_keyboard_event!(Vertical(Plus), directional, device_id, 0),
+            (Some(VirtualKeyCode::A), ButtonState::Up) => process_keyboard_event!(Horizontal(Neutral), directional, device_id, 0),
+            (Some(VirtualKeyCode::D), ButtonState::Up) => process_keyboard_event!(Horizontal(Neutral), directional, device_id, 0),
+            (Some(VirtualKeyCode::W), ButtonState::Up) => process_keyboard_event!(Vertical(Neutral), directional, device_id, 0),
+            (Some(VirtualKeyCode::S), ButtonState::Up) => process_keyboard_event!(Vertical(Neutral), directional, device_id, 0),
+            (Some(VirtualKeyCode::U), _) => process_keyboard_event!(button_state, a, device_id, 0),
+            (Some(VirtualKeyCode::I), _) => process_keyboard_event!(button_state, b, device_id, 0),
+            (Some(VirtualKeyCode::O), _) => process_keyboard_event!(button_state, c, device_id, 0),
+            (Some(VirtualKeyCode::J), _) => process_keyboard_event!(button_state, x, device_id, 0),
+            (Some(VirtualKeyCode::K), _) => process_keyboard_event!(button_state, y, device_id, 0),
+            (Some(VirtualKeyCode::L), _) => process_keyboard_event!(button_state, z, device_id, 0),
+            (Some(VirtualKeyCode::Back), _) => process_keyboard_event!(button_state, back, device_id, 0),
+            (Some(VirtualKeyCode::Return), _) => process_keyboard_event!(button_state, start, device_id, 0),
+            // numpad keys mapping: directional arrows for direction, numpad 7/8/9 for A/B/C buttons, numpad 4/5/6 for X/Y/Z buttons, numpad enter for start, numpad comma for back
+            (Some(VirtualKeyCode::Left), ButtonState::Down) => process_keyboard_event!(Horizontal(Minus), directional, device_id, 1),
+            (Some(VirtualKeyCode::Right), ButtonState::Down) => process_keyboard_event!(Horizontal(Plus), directional, device_id, 1),
+            (Some(VirtualKeyCode::Up), ButtonState::Down) => process_keyboard_event!(Vertical(Minus), directional, device_id, 1),
+            (Some(VirtualKeyCode::Down), ButtonState::Down) => process_keyboard_event!(Vertical(Plus), directional, device_id, 1),
+            (Some(VirtualKeyCode::Left), ButtonState::Up) => process_keyboard_event!(Horizontal(Neutral), directional, device_id, 1),
+            (Some(VirtualKeyCode::Right), ButtonState::Up) => process_keyboard_event!(Horizontal(Neutral), directional, device_id, 1),
+            (Some(VirtualKeyCode::Up), ButtonState::Up) => process_keyboard_event!(Vertical(Neutral), directional, device_id, 1),
+            (Some(VirtualKeyCode::Down), ButtonState::Up) => process_keyboard_event!(Vertical(Neutral), directional, device_id, 1),
+            (Some(VirtualKeyCode::Numpad7), _) => process_keyboard_event!(button_state, a, device_id, 1),
+            (Some(VirtualKeyCode::Numpad8), _) => process_keyboard_event!(button_state, b, device_id, 1),
+            (Some(VirtualKeyCode::Numpad9), _) => process_keyboard_event!(button_state, c, device_id, 1),
+            (Some(VirtualKeyCode::Numpad4), _) => process_keyboard_event!(button_state, x, device_id, 1),
+            (Some(VirtualKeyCode::Numpad5), _) => process_keyboard_event!(button_state, y, device_id, 1),
+            (Some(VirtualKeyCode::Numpad6), _) => process_keyboard_event!(button_state, z, device_id, 1),
+            (Some(VirtualKeyCode::NumpadComma), _) => process_keyboard_event!(button_state, back, device_id, 1),
+            (Some(VirtualKeyCode::NumpadEnter), _) => process_keyboard_event!(button_state, start, device_id, 1),
+            _ => None,
+        }
+    }
+    pub fn process_controller_axis_event(&mut self, device_id: DeviceId, axis: u32, value: f64) -> Option<event::Event> {
+        let direction_motion_opt = {
+            use DirectionalMotion::*;
+            use DirectionState::*;
+            let positive = value > MOTION_AXIS_THRESHOLD;
+            let negative = value < -MOTION_AXIS_THRESHOLD;
+            match axis {
+                0 => {
+                    // horizontal
+                    match (positive, negative) {
+                        (true, false) => Some(Horizontal(Plus)),
+                        (false, true) => Some(Horizontal(Minus)),
+                        (false, false) => Some(Horizontal(Neutral)),
+                        _ => None
                     }
-                }
+                },
+                1 => {
+                    // vertical
+                    match (positive, negative) {
+                        (true, false) => Some(Vertical(Minus)),
+                        (false, true) => Some(Vertical(Plus)),
+                        (false, false) => Some(Vertical(Neutral)),
+                        _ => None
+                    }
+                },
+                _ => None,
             }
-        }
-        let num_joysticks = self.sdl_gc.num_joysticks().unwrap_or(0);
-        for i in 0..num_joysticks {
-            if self.sdl_gc.is_game_controller(i) {
-                    match self.sdl_gc.open(i) {
-                    Ok(game_controller) => self.add_game_controller(game_controller, i as usize),
-                    Err(e) => log::error!("Unable to load game controller {}: {}", i, e),
-                }
-            }
-        }
-    }
-    fn add_game_controller(&mut self, sdl_game_controller: sdl2::controller::GameController, sdl_id: usize) {
-        let name = sdl_game_controller.name();
-        // TODO: read initial state better
-        let initial_state = State::new();
-        log::info!("Adding controller {name}");
-        let device = Device::new(DeviceType::GameController, name, initial_state, DeviceInternal::GameController(sdl_game_controller));
-        self.add_device(device, sdl_id);
-    }
-    fn add_device(&mut self, device: Device, sdl_id: usize) {
-        let device_id = self.devices.len();
-        self.device_sdl_map.insert(DeviceKey::new(device.device_type(), sdl_id), device_id);
-        self.devices.push(device);
-    }
-    fn sdl_device_id(&self, sdl_which: i32) -> Option<usize> {
-        if let Some(device_id) = self.device_sdl_map.get(&DeviceKey::new(DeviceType::GameController, sdl_which as usize)) {
-            Some(*device_id)
+        };
+        if let Some(direction_motion) = direction_motion_opt {
+            process_controller_event!(direction_motion, directional, device_id, &mut self.devices_map)
         }
         else {
             None
         }
     }
-    pub fn process_sdl_event(&mut self, sdl_event: sdl2::event::Event) -> Option<event::Event> {
-        macro_rules! process_input_event {
-            ($input_option: expr, $input_ident: ident, $which: expr) => (
-                if let Some(input) = $input_option {
-                    let device_id = self.sdl_device_id($which).unwrap();
-                    let processed_partial_state_opt = {
-                        let mut partial_state = PartialState::new();
-                        partial_state.$input_ident = Some(input);
-                        self.devices[device_id].process_state(partial_state)
-                    };
-                    if let Some(partial_state) = processed_partial_state_opt {
-                        let event = event::Event {
-                            device_id,
-                            partial_state,
-                        };
-                        Some(event)
-                    }
-                    else {
-                        None
-                    }
-                }
-                else {
-                    None
-                }
-            )
-        }
-        macro_rules! process_input_button {
+    pub fn process_device_event(&mut self, device_id: DeviceId, device_event: DeviceEvent) -> Option<event::Event> {
+        macro_rules! process_controller_button {
             ($input_state_option: expr, $input_button: expr, $which: expr) => (
                 match $input_button {
-                    Button::A => process_input_event!($input_state_option, a, $which),
-                    Button::B => process_input_event!($input_state_option, b, $which),
-                    Button::C => process_input_event!($input_state_option, c, $which),
-                    Button::X => process_input_event!($input_state_option, x, $which),
-                    Button::Y => process_input_event!($input_state_option, y, $which),
-                    Button::Z => process_input_event!($input_state_option, z, $which),
-                    Button::Start => process_input_event!($input_state_option, start, $which),
-                    Button::Back => process_input_event!($input_state_option, back, $which),
+                    Button::A => process_controller_event!($input_state_option, a, $which, &mut self.devices_map),
+                    Button::B => process_controller_event!($input_state_option, b, $which, &mut self.devices_map),
+                    Button::C => process_controller_event!($input_state_option, c, $which, &mut self.devices_map),
+                    Button::X => process_controller_event!($input_state_option, x, $which, &mut self.devices_map),
+                    Button::Y => process_controller_event!($input_state_option, y, $which, &mut self.devices_map),
+                    Button::Z => process_controller_event!($input_state_option, z, $which, &mut self.devices_map),
+                    Button::Start => process_controller_event!($input_state_option, start, $which, &mut self.devices_map),
+                    Button::Back => process_controller_event!($input_state_option, back, $which, &mut self.devices_map),
                 }
             )
         }
-        match sdl_event {
-            sdl2::event::Event::ControllerAxisMotion {
-                timestamp: _,
-                which,
-                axis,
-                value,
-            } => {
-                let direction_motion_option = {
-                    use DirectionalMotion::*;
-                    use DirectionState::*;
-                    let positive = value > SDL_AXIS_THRESHOLD;
-                    let negative = value < -SDL_AXIS_THRESHOLD;
-                    match axis {
-                        sdl2::controller::Axis::LeftX => {
-                            match (positive, negative) {
-                                (true, false) => Some(Horizontal(Plus)),
-                                (false, true) => Some(Horizontal(Minus)),
-                                (false, false) => Some(Horizontal(Neutral)),
-                                _ => None
-                            }
-                        },
-                        sdl2::controller::Axis::LeftY => {
-                            match (positive, negative) {
-                                (true, false) => Some(Vertical(Minus)),
-                                (false, true) => Some(Vertical(Plus)),
-                                (false, false) => Some(Vertical(Neutral)),
-                                _ => None
-                            }
-                        },
-                        _ => None,
-                    }
-                };
-                process_input_event!(direction_motion_option, directional, which)
+        match device_event {
+            DeviceEvent::Added => {
+                // TODO
+                None
             },
-            sdl2::event::Event::ControllerButtonDown {
-                timestamp: _,
-                which,
-                button,
-            } => {
-                if let Some(input_button) = controller_button(button) {
-                    process_input_button!(Some(ButtonState::Down), input_button, which)
-                }
-                else {
-                    None
-                }
+            DeviceEvent::Removed => {
+                // TODO
+                None
             },
-            sdl2::event::Event::ControllerButtonUp {
-                timestamp: _,
-                which,
-                button,
-            } => {
-                if let Some(input_button) = controller_button(button) {
-                    process_input_button!(Some(ButtonState::Up), input_button, which)
-                }
-                else {
-                    None
-                }
-            },
-            _ => None,
-        }
-    }
-}
+            DeviceEvent::Button { button, state } => {
+                let button_state: ButtonState = state.into();
 
-impl DeviceKey {
-    fn new(device_type: DeviceType, sdl_id: usize) -> DeviceKey {
-        DeviceKey {
-            device_type,
-            sdl_id,
+                if let Some(input_button) = controller_button(button) {
+                    process_controller_button!(button_state, input_button, device_id)
+                }
+                else {
+                    None
+                }
+            },
+            DeviceEvent::Motion { axis, value } => self.process_controller_axis_event(device_id, axis, value),
+            DeviceEvent::Text { codepoint } => {
+                log::debug!("Input event of type text with codepoint {codepoint}");
+                None
+            },
+            DeviceEvent::Key(keyboard_input) => self.process_keyboard_input_event(device_id, keyboard_input),
+            _ => None,
         }
     }
 }
