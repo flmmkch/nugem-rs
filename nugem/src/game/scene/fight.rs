@@ -37,7 +37,7 @@ struct CharaData {
     pub sff_data: nugem_sff::SpriteFile,
     pub animations: Vec<air::Animation>,
     // TODO use commands
-    pub _commands: Vec<command::Command>,
+    pub _commands: command::CommandConfiguration,
 }
 
 pub struct Fight {
@@ -179,6 +179,7 @@ impl Scene for Fight {
                         None?
                     }
                 };
+                
                 let animations : Vec<_> = {
                     // first use a btreemap for the animations to be in order
                     character

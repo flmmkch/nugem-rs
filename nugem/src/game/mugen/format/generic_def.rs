@@ -1,5 +1,6 @@
 use regex::bytes::{Regex, Captures, Match};
-use std::io::{BufReader, Read, BufRead};
+use skip_bom::SkipEncodingBom;
+use std::io::{BufReader, Read};
 use lazy_static::lazy_static;
 
 #[derive(Clone, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
@@ -14,17 +15,32 @@ pub struct Category {
     lines: Vec<(u64, DefLine)>,
 }
 
-pub struct Categories<T: BufRead> {
-    buf_reader: T,
+pub struct Categories<R: Read> {
+    reader: BufReader<SkipEncodingBom<R>>,
     category_name: Option<String>,
     category_line_number: u64,
     line_number: u64,
 }
 
-impl<T: BufRead> Iterator for Categories<T> {
+impl<R: Read> Categories<R> {
+    /// Read a *.def file and get an iterator on the categories
+    pub fn read_def(input: R) -> Self {
+        let reader = BufReader::new(SkipEncodingBom::new(input));
+        Self {
+            reader,
+            category_name: None,
+            line_number: 1,
+            category_line_number: 1,
+        }
+    }
+}
+
+impl<R: Read> Iterator for Categories<R> {
     type Item = (u64, Category);
 
     fn next(&mut self) -> Option<Self::Item> {
+        use std::io::BufRead;
+        
         let mut next_category_name = None;
         let mut category_lines = Vec::new();
         let mut line = Vec::new();
@@ -33,7 +49,7 @@ impl<T: BufRead> Iterator for Categories<T> {
         while !eof && next_category_name.is_none() {
             previous_category_line_number = self.category_line_number;
             line.clear();
-            match self.buf_reader.read_until(b'\n', &mut line) {
+            match self.reader.read_until(b'\n', &mut line) {
                 Ok(0) => eof = true,
                 Ok(_) => {
                     // read the next category
@@ -82,19 +98,6 @@ impl<T: BufRead> Iterator for Categories<T> {
         }
         else {
             None
-        }
-    }
-}
-
-impl<T: Read> Categories<BufReader<T>> {
-    /// Read a *.def file and get an iterator on the categories
-    pub fn read_def(input: T) -> Self {
-        let buffer = BufReader::new(input);
-        Self {
-            buf_reader: buffer,
-            category_name: None,
-            line_number: 1,
-            category_line_number: 1,
         }
     }
 }

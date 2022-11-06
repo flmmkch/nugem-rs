@@ -107,7 +107,7 @@ fn parse_release_modifier(input: &str) -> IResult<&str, Option<u16>>
     (input)
 }
 
-fn parse_button_symbol(input: &str) -> IResult<&str, input::Button>
+pub fn parse_button_symbol(input: &str) -> IResult<&str, input::Button>
 {
     alt((
         value(input::Button::A, tag("a")),

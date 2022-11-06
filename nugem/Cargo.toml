@@ -25,6 +25,7 @@ unrar_sys = { version = "0.2", optional = true }
 thiserror = "1.0"
 pollster = "0.2"
 gilrs = "0.9"
+skip_bom = "0.2"
 
 [target.'cfg(target_arch = "wasm32-unknown-unknown")'.dependencies]
 # TODO

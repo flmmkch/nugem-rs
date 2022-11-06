@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use super::character_info::{self, CharacterInfo};
+use super::command::CommandConfiguration;
 use super::{command, file_reader};
 use crate::game::mugen::character::air::{read_air_file, Animation};
 use crate::game::mugen::format::generic_def::Categories;
@@ -114,23 +115,13 @@ impl Character {
             })
     }
 
-    fn read_commands_opt(&mut self) -> Option<std::io::Result<Vec<super::command::Command>>>
+    pub fn read_commands(&mut self) -> std::io::Result<CommandConfiguration>
     {
         let (info, file_reader) = (&self.info, &mut self.file_reader);
         let character_name = Self::name_from_borrowed_info(&info);
-        let cmd_file_name = info.get("files").and_then(|f| f.get("cmd"))?;
+        let cmd_file_name = info.get("files").and_then(|f| f.get("cmd")).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Missing CMD file path"))?;
         let cmd_file_path = self.character_files_path_root.join(&cmd_file_name);
-        let result = file_reader.read_file(&cmd_file_path)
-            .map(|cmd_file| command::read_cmd_file(cmd_file, character_name));
-        Some(result)
-    }
-
-    pub fn read_commands(&mut self) -> Result<Vec<super::command::Command>, std::io::Error> {
-        if let Some(cmd_result) = self.read_commands_opt() {
-            cmd_result
-        } else {
-            log::error!("Missing command file for character {0}", self.name());
-            Ok(Default::default())
-        }
+        file_reader.read_file(&cmd_file_path)
+            .map(|cmd_file| command::read_cmd_file(cmd_file, character_name))
     }
 }

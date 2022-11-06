@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io::BufRead;
 use crate::game::mugen::format::generic_def::{Categories, DefLine};
 
 pub type CharacterInfo = HashMap<String, HashMap<String, String>>;
@@ -19,7 +18,7 @@ impl ValidInfo for CharacterInfo {
     }
 }
 
-pub fn read_def<T: BufRead>(def_categories: Categories<T>) -> CharacterInfo {
+pub fn read_def<R: std::io::Read>(def_categories: Categories<R>) -> CharacterInfo {
     let mut character_info = CharacterInfo::new();
     for (_, category) in def_categories {
         let cat_name = category.name().to_lowercase();
