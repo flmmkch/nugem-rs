@@ -1462,9 +1462,9 @@ dependencies = [
 
 [[package]]
 name = "skip_bom"
-version = "0.2.3"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "483047d1a6144d02f92a8b8faea7a7980add1e225da70f84d375091c1d87f7bb"
+checksum = "11fc051c9006de507121d84c58116c4cffc18e9adc8d7012408b19743c300cfc"
 
 [[package]]
 name = "slotmap"
