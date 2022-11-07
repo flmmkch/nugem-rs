@@ -1,5 +1,5 @@
 use regex::bytes::{Regex, Captures, Match};
-use skip_bom::SkipEncodingBom;
+use skip_bom::{BomType, SkipEncodingBom};
 use std::io::{BufReader, Read};
 use lazy_static::lazy_static;
 
@@ -16,7 +16,7 @@ pub struct Category {
 }
 
 pub struct Categories<R: Read> {
-    reader: BufReader<SkipEncodingBom<R>>,
+    reader: BufReader<SkipEncodingBom<'static, R>>,
     category_name: Option<String>,
     category_line_number: u64,
     line_number: u64,
@@ -25,7 +25,7 @@ pub struct Categories<R: Read> {
 impl<R: Read> Categories<R> {
     /// Read a *.def file and get an iterator on the categories
     pub fn read_def(input: R) -> Self {
-        let reader = BufReader::new(SkipEncodingBom::new(input));
+        let reader = BufReader::new(SkipEncodingBom::new(&[BomType::UTF8], input));
         Self {
             reader,
             category_name: None,
