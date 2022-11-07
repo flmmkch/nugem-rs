@@ -1,8 +1,8 @@
 # nugem
 
-**nugem** is a 2D fighting game engine based on Mugen.
+**nugem** is a 2D fighting game engine aiming for compatibility with [Mugen](https://en.wikipedia.org/wiki/Mugen_(game_engine)).
 
-Currently the functionalities are limited to rendering sprites and animations. You can change the displayed character and animation using directional inputs on the controller. 
+Currently, the functionalities are limited to rendering sprites and animations. You can change the displayed character and animation using directional inputs on the controller. 
 
 Arguments:
 * `--data  path/to/data/folder/` add a data folder (can be multiple). A data folder may contain subfolders for Mugen characters.
