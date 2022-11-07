@@ -15,7 +15,13 @@ Others to be documented
 
 ## Reference
 
-### Mugen file parsing
+### Mugen file compatibility
 
-* Elecbyte wiki on the Internet Archive: https://web.archive.org/web/20150613185024/http://elecbyte.com/wiki/index.php/Main_Page
-* CMD parsing: https://mugenguild.com/forum/topics/the-cmd-file-169932.0.html
+* [Elecbyte wiki on the Internet Archive](https://web.archive.org/web/20150613185024/http://elecbyte.com/wiki/index.php/Main_Page)
+* [Resources from the official MUGEN builds](https://mugenarchive.com/forums/downloads.php?do=cat&id=39-mugen-builds)
+
+### WGPU
+
+ * [WGPU tutorial](https://sotrh.github.io/learn-wgpu/)
+ * [Shaders: WGSL reference](https://www.w3.org/TR/WGSL/)
+ * [WebGPU API reference](https://gpuweb.github.io/gpuweb/#enumdef-gpufiltermode)
